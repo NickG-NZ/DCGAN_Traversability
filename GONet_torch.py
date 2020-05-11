@@ -7,6 +7,19 @@ import matplotlib.pyplot as plt
 
 # torch
 import torch
+import torch.nn as nn
+import torch.optim as optim
+from torch.utils.data import DataLoader
+from torch.utils.data import sampler
+import torchvision.transforms as T
+
+
+USE_GPU = True
+
+if USE_GPU and torch.cuda.is_available():
+	device = torch.device('cuda')
+else:
+	device = torch.device('cpu')
 
 
 """Image constants"""
@@ -29,9 +42,20 @@ rsizey = 128
 outlist = np.zeros(15)
 
 
-class Generator(torch.Module):
+class Generator(nn.Module):
+	"""Encodes images into a lower dimensional representation"""
+	def __init__(self):
+		super().__init__()
+
+
+class invGen(nn.Module):
 	"""Generates fake images of how the scene should
 		appear if it is traversable"""
-	def __init__(self):
-		super().__init__(self)
 
+
+def main():
+	print(f"Using device: {device}")
+
+
+if __name__ == "__main__":
+	main()
