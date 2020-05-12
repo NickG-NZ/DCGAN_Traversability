@@ -1,7 +1,0 @@
-- Create list of installed dependencies (w/ versions)
-- Create conda install instructions
-
-- Download dataset
-- Create document listing where to save dataset
-- Read paper and write summary of method
-- Write training script for models (based on paper)
