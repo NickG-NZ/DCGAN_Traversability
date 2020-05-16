@@ -11,17 +11,34 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
 from torch.utils.data import sampler
-import torchvision.transforms as Training
+import torchvision.transforms as T
 
 import numpy as np
 import matplotlib.pyplot as plot
 
-from PIL import Image
-from PIL.ImageOps import mirror
-
 
 USE_GPU = False
-dtype = torch.float32
+
+DTYPE = torch.float32
+
+WORKERS = 2  # number of threads for dataloaders
+
+IMAGE_SIZE = 128
+
+NUM_EPOCHS = 5
+
+BETA1 = 0.5  # For ADAM optimizer
+
+
+# Params for Gen
+LR_GEN = 0.0001
+BATCH_SIZE_GEN = 64
+NZ = 100  # size of latent vector z
+
+# Params for Dis
+LR_DIS = 0.0004
+BATCH_SIZE_DIS = 64
+
 
 if USE_GPU and torch.cuda.is_available():
 	device = torch.device('cuda')
@@ -61,8 +78,11 @@ def load_data_sets(root_path):
 	Returns:
 	- data_loaders: dictionary of pytorch Dataset objects
 		{"train":, "test":, "val":, "train_labelled", "test_labelled", "val_labelled"}
-	
-	
+	"""
+	transform = T.Compose([
+					T.Resize(image_size)
+					T.ToTensor(),
+					T.Normalize()])
 
 
 def main():
