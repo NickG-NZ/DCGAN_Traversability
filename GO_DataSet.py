@@ -35,8 +35,8 @@ class GONetDataSet(Dataset):
 		self.root_dir = root_dir
 		self.split = split
 		self.label = label
-		self.split_folder = self._split_folder_name()  # (string) top level folder of selected split
-		self.split_dir = os.path.join(self.root_dir, self.split_folder)
+		self.split_name = self._split_folder_name()  # (string) top level folder of selected split
+		self.split_dir = os.path.join(self.root_dir, self.split_name)
 
 		self._check_directories_valid()
 		self.data_folders = self._get_data_dirs()  # dict of paths for each subfolder
@@ -153,3 +153,19 @@ class Normalize:
 			raise ValueError("Image should have been normalized to range [0.0, 1.0]")
 		image *= 2 - 1
 		return image
+
+
+def display_num_images(data_sets):
+	"""
+	Displays the number of images in each data set in the
+	list data_sets
+
+	Inputs:
+	- data_sets: (list) of GONetDataSet objects
+	"""
+	for dataset in data_sets:
+		name = dataset.split_name
+		print("\n")
+		print(f"Dataset: {name}")
+		for folder, count in dataset.folder_counts.items():
+			print(f"num images in {folder} folder = {count}")

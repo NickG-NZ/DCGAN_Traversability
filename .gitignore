@@ -3,3 +3,5 @@
 .ipynb_checkpoints
 .pyc
 TODO.txt
+/.idea
+/__pycache__
