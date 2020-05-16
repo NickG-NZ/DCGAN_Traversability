@@ -114,7 +114,7 @@ Need to select z so that I' = Gen(z) looks like I.
 	> Pass Z vector batches through Gen then Dis (labels should be all 0.0)
 	> Pass data batches directly through Dis (labels should be all 1.0)
 	> Dis loss use Binary cross-entropy (two minibatches are used, one from data, one from Gen)
-		min Ld = -log(D(x)) - log(1 - G(z))
+		min Ld = -log(D(x)) - log(1 - D(G(z)))
 	> Gen loss use min Lg = -log(D(G(z)))
 
 2) Train the AutoEncoder
