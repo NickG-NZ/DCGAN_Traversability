@@ -135,7 +135,7 @@ Need to select z so that I' = Gen(z) looks like I.
 Multiple Datasets: GS1, GS2.
 GS2 is stereo (we can ignore for now)
 
-All images need to be resized to 3x128x128
+All images need to be 3x128x128 (This resize has already been done for us)
 
 Augmentation:
 	Flip the images in GS1 horizontally

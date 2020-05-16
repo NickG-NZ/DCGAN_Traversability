@@ -10,7 +10,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
-from torch.utils.data import sampler
+from torch.utils.data import RandomSampler
 import torchvision.transforms as T
 
 import numpy as np
@@ -82,8 +82,12 @@ def load_data_sets(root_path):
 	transform = T.Compose([
 					T.Resize(image_size)
 					T.ToTensor(),
-					T.Normalize()])
+					Normalize()])
 
+	sampler = RandomSampler()
 
 def main():
+
+
+
 	pass

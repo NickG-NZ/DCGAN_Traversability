@@ -1,17 +1,16 @@
 """
-Creating a pytorch dataset from the GONet images
+Creating a Pytorch dataset from the GONet image data
 @author Nick Goodson
 """
 
-import sys
 import os
-import argparse
 
 import torch
 from torch.utils.data import Dataset
-import torchvision.transforms as Training
+import torchvision.transforms as T
 
 import numpy as np
+import time
 
 from PIL import Image
 from PIL.ImageOps import mirror
@@ -41,7 +40,7 @@ class GONetDataSet(Dataset)
 		- split (string): "train", "val" or "test"
 		- label (string): "positive" or "mixed"
 				(for training feature extractor vs. classifier)
-		- transform (callable): Optional transform to be applied on a sample
+		- transform (callable): Optional transform/s to be applied on a sample
 		"""
 		self.root_dir
 		self.split = split
@@ -50,7 +49,8 @@ class GONetDataSet(Dataset)
 		self.split_dir = os.path.join(self.root_dir, self.split_folder)
 
 		self._check_directories_valid()
-		self.data_folders = self._get_data_dirs()  # dict of paths for each label 
+		self.data_folders = self._get_data_dirs()  # dict of paths for each subfolder
+		self.folder_counts = self.num_images_in_folders()  # dict of num imgs in each subfolder
 		self.transform = transform
 
 	def __len__(self):
@@ -59,23 +59,41 @@ class GONetDataSet(Dataset)
 			num_images += count
 		return num_images
 
-	def num_images_in_folders(self):
-		"""
-		Returns the number of images in each of
-		the folders in self.data_folders
-		"""
-		folder_counts = {}
-		for name, folder_path in self.data_folders.items():
-			folder_counts[name] = len(os.listdir(folder_path))
-		return folder_counts
-
 	def __getitem__(self, idx):
+		"""
+		Creates a mapping between integer idx and
+		images in the data_folders
+		"""
 		if torch.is_tensor(idx):
-			idx = idx.tolist()
+			idx_list = idx.tolist()
+			idx = idx_list[0]
 
-		img_name = os.path.join(self.)
+		# Debugging code (delete later)
+		# --------------------
+		if len(idx_list) > 1:
+			print("idx has more than one item")
+			raise ValueError("To stop the program")
+		# --------------------------
 
-		im = np.asarray(Image.open(path))
+		# Place the folders in an arbitrary order for extracting images
+		# using indexes from 0 to the length of the dataset
+		folder_counts = sorted(self.folder_counts.items())
+		f_idx = 0
+		(folder, count) = folder_counts[f_idx]
+		while idx > count:
+			idx -= count  # start idx at beginning of next folder
+			f_idx += 1
+			if f_idx > len(folder_counts)-1:
+				raise IndexError(\
+					"index requested from the dataset exceeds dataset length")
+			(folder, count) = folder_counts[f_idx]
+		img_path = self.data_folders[folder]
+
+		# Load image and apply transforms from Compose object
+		img = self.transform(np.array(Image.open(path)))
+		label = 1.0 if "positive" in folder else 0.0
+
+		return (img, label)
 
 	def _split_folder_name(self):
 		"""
@@ -104,7 +122,7 @@ class GONetDataSet(Dataset)
 
 	def _get_data_dirs(self):
 		"""
-		Returns a dictonary of paths for each of
+		Returns a dictionary of paths for each of
 		the useful sub folders.
 		The keys of the dictionary depend on self.label
 		"positive" or "mixed"
@@ -113,6 +131,31 @@ class GONetDataSet(Dataset)
 					"mixed": ["positive_R", "positive_L", "negative_R", "negative_L"]}
 		data_folders = {sub: os.path.join(self.split_dir, sub) for sub in subfolders[self.label]}
 		return data_folders
+
+	def num_images_in_folders(self):
+		"""
+		Returns a dict with the number of images in each of
+		the folders in self.data_folders
+		"""
+		folder_counts = {}
+		for name, folder_path in self.data_folders.items():
+			folder_counts[name] = len(os.listdir(folder_path))
+		return folder_counts
+
+
+class Normalize():
+	"""
+	An image tranformation class. 
+	Normalizes images to the range [-1, 1]
+	"""
+
+	def __call__(self, sample):
+		"""
+		Inputs:
+		- sample: the datapoint (image, label)
+			image is a torch tensor, label is an integer {0,1}
+		"""
+		(image, label) = sample
+		if not is_tensor(image):
+			raise TypeError("Normalize takes images as pytorch tensors")
 		
-
-
