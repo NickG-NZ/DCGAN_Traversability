@@ -7,16 +7,12 @@ import os
 
 import torch
 from torch.utils.data import Dataset
-import torchvision.transforms as T
 
 import numpy as np
 import time
 
 from PIL import Image
 from PIL.ImageOps import mirror
-
-
-DATA_FOLDER_NAME = "GO_Data"
 
 
 class GONetDataSet(Dataset)
@@ -32,16 +28,15 @@ class GONetDataSet(Dataset)
 	This class constructs a Pytorch Dataset object corresponding
 	to a single one of the 6 folders listed above.
 	The unlabelled data is not used in any dataset objects that are created.
+
+	Args:
+	- root_dir (string): Absolute path to directory with image folders
+	- split (string): "train", "vali" or "test"
+	- label (string): "positive" or "mixed"
+			(for training feature extractor vs. classifier)
+	- transform (callable): Optional transform/s to be applied on a sample
 	"""
 	def __init__(self, root_dir, split, label="positive", transform=None):
-		"""
-		Inputs:
-		- root_dir (string): Absolute path to directory with image folders
-		- split (string): "train", "val" or "test"
-		- label (string): "positive" or "mixed"
-				(for training feature extractor vs. classifier)
-		- transform (callable): Optional transform/s to be applied on a sample
-		"""
 		self.root_dir
 		self.split = split
 		self.label = label
@@ -54,6 +49,10 @@ class GONetDataSet(Dataset)
 		self.transform = transform
 
 	def __len__(self):
+		"""
+		Returns the number of images in this instance
+		of the dataset
+		"""
 		num_images = 0
 		for _, count in self.num_images_in_folders().items():
 			num_images += count
@@ -63,6 +62,13 @@ class GONetDataSet(Dataset)
 		"""
 		Creates a mapping between integer idx and
 		images in the data_folders
+
+		Inputs:
+		- idx: an index from a Sampler corresponding to a particular image
+
+		Returns:
+		- (image, label): (tuple) contains the processed image, and label
+				label is either 0.0 or 1.0 for negative and positve images respectively 
 		"""
 		if torch.is_tensor(idx):
 			idx_list = idx.tolist()
@@ -90,7 +96,7 @@ class GONetDataSet(Dataset)
 		img_path = self.data_folders[folder]
 
 		# Load image and apply transforms from Compose object
-		img = self.transform(np.array(Image.open(path)))
+		img = self.transform(Image.open(path))
 		label = 1.0 if "positive" in folder else 0.0
 
 		return (img, label)
@@ -145,17 +151,19 @@ class GONetDataSet(Dataset)
 
 class Normalize():
 	"""
-	An image tranformation class. 
+	An image tranformation.
 	Normalizes images to the range [-1, 1]
 	"""
-
-	def __call__(self, sample):
+	def __call__(self, image):
 		"""
 		Inputs:
-		- sample: the datapoint (image, label)
-			image is a torch tensor, label is an integer {0,1}
+		- image: (torch tensor) the datapoint. image should already be
+			normalized in range [0.0, 1.0] by the ToTensor() transform
+
 		"""
-		(image, label) = sample
 		if not is_tensor(image):
 			raise TypeError("Normalize takes images as pytorch tensors")
-		
+		if image.max() > 1.0 or image.min() < 0.0:
+			raise ValueError("Image should have been normalized to range [0.0, 1.0]")
+		image *= 2 - 1
+		return (image, label)
