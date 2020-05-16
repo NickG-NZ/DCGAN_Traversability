@@ -182,3 +182,4 @@ This prevents extreme extrapolation behavior in the discriminator
 - Spectral normalization
 - Try Wasserstein loss Ld = D(x) - D(G(z)), Lg = -D(G(z))
 - Set beta1 for Adam = 0.5
+- Init weights from normal dist mean = 0, stddev = 0.02

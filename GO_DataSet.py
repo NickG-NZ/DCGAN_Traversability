@@ -64,12 +64,13 @@ class GONetDataSet(Dataset):
 		- (image, label): (tuple) contains the processed image, and label is either 0.0 or 1.0
 						for negative and positve images respectively
 		"""
+		idx_list = []
 		if torch.is_tensor(idx):
 			idx_list = idx.tolist()
 			idx = idx_list[0]
 
 		# Debugging code (delete later)
-		# --------------------
+		# -----------------------------
 		if len(idx_list) > 1:
 			print("idx has more than one item")
 			raise ValueError("To stop the program")
@@ -86,7 +87,8 @@ class GONetDataSet(Dataset):
 			if f_idx > len(folder_counts)-1:
 				raise IndexError("index requested from the dataset exceeds dataset length")
 			(folder, count) = folder_counts[f_idx]
-		img_path = self.data_folders[folder]
+		folder_path = self.data_folders[folder]
+		img_path = os.path.join(folder_path, os.listdir(folder_path)[idx])
 
 		# Load image and apply transforms from Compose object
 		img = self.transform(Image.open(img_path))
@@ -144,7 +146,7 @@ class Normalize:
 	def __call__(self, image):
 		"""
 		Inputs:
-		- image: (torch tensor) the datapoint. image should already be normalized in range [0.0, 1.0]
+		- image: (torch tensor) image should already be normalized in range [0.0, 1.0]
 				by the ToTensor() transform
 		"""
 		if not torch.is_tensor(image):
