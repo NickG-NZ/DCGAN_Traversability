@@ -29,6 +29,7 @@ DTYPE = torch.float32
 WORKERS = 0  # number of threads for Dataloaders (0 = singlethreaded)
 IMAGE_SIZE = 128
 RANDOM_SEED = 222
+PRINT_EVERY = 20  # num epochs between printing learning stats
 
 if USE_GPU and torch.cuda.is_available():
 	device = torch.device('cuda')
@@ -39,7 +40,7 @@ print(f"using device: {device}")
 torch.manual_seed(RANDOM_SEED)
 
 
-def train_DCGAN(gen, dis, optimizer, data_loader, hyper_params, epochs=1, save_checkpoints=None, ):
+def train_DCGAN(gen, dis, optimizer, loss_fn, data_loader, batch_size, nz, epochs=1, save_checkpoints=None):
 	"""
 	Training the DCGAN on GONet data-set using Pytorch.
 	Training is done on all positive examples from the data-set
@@ -50,30 +51,57 @@ def train_DCGAN(gen, dis, optimizer, data_loader, hyper_params, epochs=1, save_c
 	- gen: The generator network
 	- dis: The discriminator network
 	- optimizer: An Optimizer object
+	- loss_fn: The loss function to optimize
 	- data_loader: Dataloader object for training data
-	- hyper_params: (dict) of hyper-parameters -> {lr_gen, lr_dis, batch_size, beta1, nz}
+	- batch_size
+	- nz: size of the latent vector z used for the generator
 	- epochs: (optional) integer giving number of epochs to train for
 	- save_checkpoints: (optional) integer giving frequency of saves in epochs
 
 	Returns:
 	- nothing, displays accuracy during training and saves model.
 	"""
-	fixed_noise = torch.randn(batch_size, )
+	# Create batch of latent vectors to visualize
+	# the progression of the generator
+	fixed_noise = torch.randn(batch_size, nz, 1, 1, device=device)
+
+	gen_loss_hist = []
+	dis_loss_hist = []
+	gen_acc_hist = []
+	dis_acc_hist = []
 
 	gen = gen.to(device=device)
 	dis = dis.to(device=device)
+	gen.train()  # put the networks in training mode
+	dis.train()
+	print("Starting Training of DCGAN")
 	for e in range(epochs):
 		for t, (x, y) in enumerate(data_loader):
-			gen.train()
-			dis.train()
 			x = x.to(device=device, dtype=DTYPE)
-			y = y.to(device=device, dtype=DTYPE)
+
+			# Perform Dis Update ( maximize log(D(x)) + log(1-D(G(z)) )
+			# 1) Train with a real data batch
+			dis.zero_grad()
+			labels = torch.full((batch_size,), 0.9, device=device)  # create labels for real images
+			output = dis(x)  # two values (prob_real, prob_fake)
+			loss = loss_fn(output, labels)
+			loss.backward()  # compute gradients
+
+			# 2) Train with a fake data batch from Gen
+			z = torch.randn(batch_size, nz, 1, 1, device=device)
+			fake_imgs = gen(z)
+			labels.fill_(0.0)  # create labels for fake images
+			output = dis(fake_imgs)
+
+
+
+
 
 
 
 			# TODO: set y = 0.9/0.1
 
-
+			# TODO: write function to calculate performance on val data
 	pass
 
 
@@ -142,7 +170,12 @@ def main():
 	dis = Discriminator()
 
 	# Set up for training
-	kwargs = {"save_checkpoints": None,
+	optimizerG = optim.Adam(gen.parameters(), lr=lr_gen, betas=(beta1, 0.999))
+	optimizerD = optim.Adam(dis.parameters(), lr=lr_dis, betas=(beta1, 0.999))
+	loss = nn.BCELoss()
+
+
+
 
 if __name__ == "__main__":
 	main()
