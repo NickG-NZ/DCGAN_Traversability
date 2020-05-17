@@ -121,7 +121,7 @@ def train_dcgan(gen, dis, optimizer_g, optimizer_d, loss_fn, loader_train, loade
 						f"gen loss: {gen_loss_hist[-1]}, dis acc (real images): {dis_acc_hist}")
 
 			if count % test_gen_every == 0 or  ((e == epochs - 1) and t == len(loader_train) - 1):
-				# Create images using gen to visualize
+				# Create images using gen to visualize progress
 				with torch.no_grad():
 					ims = gen(fixed_latent_vectors).detach()
 				gen_test_imgs.append(vutils.make_grid(ims, padding=2, normalize=True))
@@ -145,6 +145,7 @@ def evaluate_accuracy(model, data_loader, num_eval=1000):
 	num_samples = 0
 	model = model.to(device=device)
 	model.eval()
+	count = 0
 	with torch.no_grad():
 		for t, (x, y) in enumerate(data_loader):
 			x = x.to(device=device, dtype=DTYPE)
@@ -155,7 +156,8 @@ def evaluate_accuracy(model, data_loader, num_eval=1000):
 			predictions = (torch.sigmoid(scores) > 0.5).float()
 			num_correct += (predictions == y).sum()
 
-			if t > num_eval:  # Test for specified num of data points
+			count += x.size()[0]
+			if count > num_eval:  # Test for specified num of data points
 				break
 	return float(num_correct) / num_samples
 
@@ -213,22 +215,6 @@ def load_feature_extraction_data(root_path, batch_size):
 							 sampler=RandomSampler(test_pos), num_workers=WORKERS)
 	data_loaders = {"train": loader_train, "val": loader_val, "test": loader_test}
 	return data_loaders, data_sets
-
-
-def sigmoid_cross_entropy_loss(logits, targets):
-	"""
-	Calculates the binary cross-entropy loss for a
-	batch of logits with respect to targets.
-	The batch dimension of targets must be the same as logits
-
-	Inputs:
-	- logits: un-normalized outputs from network (batch, 1)
-	- targets: targets corresponding to logits (batch, 1)
-	"""
-	assert (logits.size() == targets.size()), "Logits and targets must have same dimensions"
-	probs = torch.sigmoid(logits)
-	loss = -targets * torch.log(probs) - (1 - targets) * torch.log(torch.ones_like(probs) - probs)
-	return loss
 
 
 def main():
