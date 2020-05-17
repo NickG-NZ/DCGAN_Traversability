@@ -28,7 +28,7 @@ DTYPE = torch.float32
 WORKERS = 0  # number of threads for Dataloaders (0 = singlethreaded)
 IMAGE_SIZE = 128
 RANDOM_SEED = 222
-PRINT_EVERY = 20  # num epochs between printing learning stats
+PRINT_EVERY = 50  # num iterations between printing learning stats
 
 if USE_GPU and torch.cuda.is_available():
 	device = torch.device('cuda')
@@ -39,7 +39,7 @@ print(f"using device: {device}")
 torch.manual_seed(RANDOM_SEED)
 
 
-def train_dcgan(gen, dis, optimizer_g, optimizer_d, loss_fn, data_loader,
+def train_dcgan(gen, dis, optimizer_g, optimizer_d, loss_fn, loader_train, loader_val,
 				batch_size, nz, epochs=1, save_checkpoints=None):
 	"""
 	Training the DCGAN on GONet data-set using Pytorch.
@@ -64,20 +64,22 @@ def train_dcgan(gen, dis, optimizer_g, optimizer_d, loss_fn, data_loader,
 	"""
 	# Create batch of latent vectors to visualize
 	# the progression of the generator
-	fixed_noise = torch.randn(batch_size, nz, 1, 1, device=device)
-
+	fixed_latent_vectors = torch.randn(64, nz, 1, 1, device=device)
+	test_gen_every = 500  # how often to check gen on the fixed noise
+	gen_test_imgs = []
 	gen_loss_hist = []
 	dis_loss_hist = []
-	gen_acc_hist = []
 	dis_acc_hist = []
 
 	gen = gen.to(device=device)
 	dis = dis.to(device=device)
 	gen.train()  # put the networks in training mode
 	dis.train()
+	count = 0
 	print("Starting Training of DCGAN")
 	for e in range(epochs):
-		for t, (x, y) in enumerate(data_loader):
+		for t, (x, y) in enumerate(loader_train):
+			count += 1
 			x = x.to(device=device, dtype=DTYPE)
 
 			# Perform Dis training update ( minimize -ylog(D(x)) - (1-y)log(1-D(G(z)) )
@@ -99,7 +101,7 @@ def train_dcgan(gen, dis, optimizer_g, optimizer_d, loss_fn, data_loader,
 			loss_dis_fake.backward()
 
 			# 3) Adam update on Dis
-			dis_loss_hist.append(loss_dis_real + loss_dis_fake)
+			dis_loss_hist.append(loss_dis_real.item() + loss_dis_fake.item())
 			optimizer_d.step()
 
 			# Perform Gen training update ( minimize -log(D(G(z)) )
@@ -108,25 +110,72 @@ def train_dcgan(gen, dis, optimizer_g, optimizer_d, loss_fn, data_loader,
 			logits = dis(fake_imgs)
 			loss_gen = loss_fn(logits, labels)
 			loss_gen.backward()
+			gen_loss_hist.append(loss_gen.item())
 			optimizer_g.step()
 
-	# TODO: write function to calculate performance on val data
+			if count % PRINT_EVERY == 0:
+				# Calculate performance stats and display them
+				dis_acc_real = evaluate_accuracy(dis, loader_val)
+				dis_acc_hist.append(dis_acc_real)
+				print(f"Epoch {e}/{epochs}\t Iteration {count}\n dis loss: {dis_loss_hist[-1]},"
+						f"gen loss: {gen_loss_hist[-1]}, dis acc (real images): {dis_acc_hist}")
+
+			if count % test_gen_every == 0 or  ((e == epochs - 1) and t == len(loader_train) - 1):
+				# Create images using gen to visualize
+				with torch.no_grad():
+					ims = gen(fixed_latent_vectors).detach()
+				gen_test_imgs.append(vutils.make_grid(ims, padding=2, normalize=True))
+
+			if save_checkpoints:
+				if e % save_checkpoints == 0 or ((e == epochs - 1) and t == len(loader_train) - 1):
+					# Save the model weights in a folder labelled with the validation accuracy
+					save_model_params(gen, "gen", SAVE_PATH, e, gen_loss_hist[-1])
+					save_model_params(dis, "dis", SAVE_PATH, e, dis_loss_hist[-1])
+
+	return gen_test_imgs, gen_loss_hist, dis_loss_hist, dis_acc_hist
 
 
-def sigmoid_cross_entropy_loss(logits, targets):
+def evaluate_accuracy(model, data_loader, num_eval=1000):
 	"""
-	Calculates the binary cross-entropy loss for a
-	batch of logits with respect to targets.
-	The batch dimension of targets must be the same as logits
+	Evaluates accuracy of a model on a dataset
+	Assumes the loss is based on a sigmoid and that
+	the model outputs logits (un-normalized log probabilities)
+	"""
+	num_correct = 0
+	num_samples = 0
+	model = model.to(device=device)
+	model.eval()
+	with torch.no_grad():
+		for t, (x, y) in enumerate(data_loader):
+			x = x.to(device=device, dtype=DTYPE)
+			y = y.to(device=device, dtype=DTYPE)
+			num_samples += x.size()[0]
+
+			scores = model(x)
+			predictions = (torch.sigmoid(scores) > 0.5).float()
+			num_correct += (predictions == y).sum()
+
+			if t > num_eval:  # Test for specified num of data points
+				break
+	return float(num_correct) / num_samples
+
+
+def save_model_params(model, name, save_path, epoch, final_loss=None):
+	"""
+	Saves the models parameters to the selected path
+	using built in pytorch fucntionality
 
 	Inputs:
-	- logits: un-normalized outputs from network (batch, 1)
-	- targets: targets corresponding to logits (batch, 1)
+	- model: the pytorch model to save
+	- name: (string) the name to save the model as
+	- save_path: absolute path to save location
+	- final_loss: (optional float) used in the name of the file
 	"""
-	assert (logits.size() == targets.size()), "Logits and targets must have same dimensions"
-	probs = torch.sigmoid(logits)
-	loss = -targets * torch.log(probs) - (1 - targets) * torch.log(torch.ones_like(probs) - probs)
-	return loss
+	loss = final_loss if final_loss else "NA"
+	filename = f"{name}_params__loss:{loss}_epoch:{epoch}"
+	file_path = os.path.join(save_path, filename)
+	torch.save(model.state_dict(), file_path)
+	print(f"Saved model: {name} to file")
 
 
 def load_feature_extraction_data(root_path, batch_size):
@@ -166,6 +215,22 @@ def load_feature_extraction_data(root_path, batch_size):
 	return data_loaders, data_sets
 
 
+def sigmoid_cross_entropy_loss(logits, targets):
+	"""
+	Calculates the binary cross-entropy loss for a
+	batch of logits with respect to targets.
+	The batch dimension of targets must be the same as logits
+
+	Inputs:
+	- logits: un-normalized outputs from network (batch, 1)
+	- targets: targets corresponding to logits (batch, 1)
+	"""
+	assert (logits.size() == targets.size()), "Logits and targets must have same dimensions"
+	probs = torch.sigmoid(logits)
+	loss = -targets * torch.log(probs) - (1 - targets) * torch.log(torch.ones_like(probs) - probs)
+	return loss
+
+
 def main():
 	"""Run training of DCGAN"""
 	# Hyper parameters
@@ -186,7 +251,7 @@ def main():
 		plt.axis("off")
 		plt.title("Training Images")
 		plt.imshow(np.transpose(vutils.make_grid(real_batch[0].to(device)[:batch_size], padding=2,
-												normalize=True).cpu(), (1, 2, 0)))
+		                                         normalize=True).cpu(), (1, 2, 0)))
 		plt.show()
 
 	# Create the Generator and Discriminator networks
@@ -202,9 +267,34 @@ def main():
 	loss = nn.BCEWithLogitsLoss
 
 	# Train the DCGAN network
-	train_dcgan(gen, dis, optimizer_g, optimizer_d, loss, data_loaders["train"],
-				batch_size, nz, epochs=1, save_checkpoints=None)
+	gen_test_imgs, gen_loss_hist, dis_loss_hist, dis_acc_hist = \
+		train_dcgan(gen, dis, optimizer_g, optimizer_d, loss, data_loaders["train"],
+		            data_loaders["val"], batch_size, nz, epochs=1, save_checkpoints=None)
 
+	# Plot loss
+	plt.figure(figsize=(10,5))
+	plt.title("Generator and Discriminator Training Loss")
+	plt.plot(gen_loss_hist, label="gen")
+	plt.plot(dis_loss_hist, label="dis")
+	plt.xlabel("iteration")
+	plt.ylabel("loss")
+	plt.legend()
+	plt.show()
+
+	# Plot some real images and fake images
+	real_batch = next(iter(data_loaders["train"]))
+	plt.figure(figsize=(15, 15))
+	plt.subplot(1, 2, 1)
+	plt.axis("off")
+	plt.title("Real Images")
+	plt.imshow(np.transpose(vutils.make_grid(real_batch[0].to(device)[:batch_size], padding=5,
+	                                         normalize=True).cpu(), (1, 2, 0)))
+	# Plot the fake images from the last epoch
+	plt.subplot(1, 2, 2)
+	plt.axis("off")
+	plt.title("Fake Images")
+	plt.imshow(np.transpose(gen_test_imgs[-1], (1, 2, 0)))
+	plt.show()
 
 if __name__ == "__main__":
 	main()
