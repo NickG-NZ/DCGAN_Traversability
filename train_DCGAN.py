@@ -20,7 +20,6 @@ import matplotlib.pyplot as plt
 from GO_DataSet import GONetDataSet, Normalize, display_num_images
 from GONet_torch import Generator, Discriminator
 
-
 # ********* Change these paths for your computer **********************
 DATA_PATH = "/home/nick/Documents/Conv_NN_CS231n/Project/DCGAN_Traversability/GO_Data"
 SAVE_PATH = "/home/nick/Documents/Conv_NN_CS231n/Project/DCGAN_Traversability/Training_Checkpoints/DCGAN"
@@ -40,7 +39,8 @@ print(f"using device: {device}")
 torch.manual_seed(RANDOM_SEED)
 
 
-def train_DCGAN(gen, dis, optimizer, loss_fn, data_loader, batch_size, nz, epochs=1, save_checkpoints=None):
+def train_dcgan(gen, dis, optimizer_g, optimizer_d, loss_fn, data_loader,
+				batch_size, nz, epochs=1, save_checkpoints=None):
 	"""
 	Training the DCGAN on GONet data-set using Pytorch.
 	Training is done on all positive examples from the data-set
@@ -50,7 +50,8 @@ def train_DCGAN(gen, dis, optimizer, loss_fn, data_loader, batch_size, nz, epoch
 	Inputs:
 	- gen: The generator network
 	- dis: The discriminator network
-	- optimizer: An Optimizer object
+	- optimizer_g: Optimizer object for gen
+	- optimizer_d: Optimizer object for dis
 	- loss_fn: The loss function to optimize
 	- data_loader: Dataloader object for training data
 	- batch_size
@@ -79,30 +80,53 @@ def train_DCGAN(gen, dis, optimizer, loss_fn, data_loader, batch_size, nz, epoch
 		for t, (x, y) in enumerate(data_loader):
 			x = x.to(device=device, dtype=DTYPE)
 
-			# Perform Dis Update ( maximize log(D(x)) + log(1-D(G(z)) )
-			# 1) Train with a real data batch
+			# Perform Dis training update ( minimize -ylog(D(x)) - (1-y)log(1-D(G(z)) )
+			# 1) Classify a real data batch using Dis
 			dis.zero_grad()
-			labels = torch.full((batch_size,), 0.9, device=device)  # create labels for real images
-			output = dis(x)  # two values (prob_real, prob_fake)
-			loss = loss_fn(output, labels)
-			loss.backward()  # compute gradients
 
-			# 2) Train with a fake data batch from Gen
+			# create labels for real images w/ one-sided label smoothing. (This should technically be a 1.0)
+			labels = torch.full((batch_size, 1), 0.9, device=device, dtype=DTYPE)
+			logits = dis(x)  # real_scores
+			loss_dis_real = loss_fn(logits, labels)
+			loss_dis_real.backward()  # compute gradients
+
+			# 2) Classify a fake data batch (from Gen) using Dis
 			z = torch.randn(batch_size, nz, 1, 1, device=device)
 			fake_imgs = gen(z)
-			labels.fill_(0.0)  # create labels for fake images
-			output = dis(fake_imgs)
+			labels.fill_(0.0)  # create labels for fake images (no smoothing)
+			logits = dis(fake_imgs.detach())  # detach() stops gradients being propagated through gen()
+			loss_dis_fake = loss_fn(logits, labels)
+			loss_dis_fake.backward()
+
+			# 3) Adam update on Dis
+			dis_loss_hist.append(loss_dis_real + loss_dis_fake)
+			optimizer_d.step()
+
+			# Perform Gen training update ( minimize -log(D(G(z)) )
+			gen.zero_grad()
+			labels.fill_(1.0)  # label swap trick
+			logits = dis(fake_imgs)
+			loss_gen = loss_fn(logits, labels)
+			loss_gen.backward()
+			optimizer_g.step()
+
+	# TODO: write function to calculate performance on val data
 
 
+def sigmoid_cross_entropy_loss(logits, targets):
+	"""
+	Calculates the binary cross-entropy loss for a
+	batch of logits with respect to targets.
+	The batch dimension of targets must be the same as logits
 
-
-
-
-
-			# TODO: set y = 0.9/0.1
-
-			# TODO: write function to calculate performance on val data
-	pass
+	Inputs:
+	- logits: un-normalized outputs from network (batch, 1)
+	- targets: targets corresponding to logits (batch, 1)
+	"""
+	assert (logits.size() == targets.size()), "Logits and targets must have same dimensions"
+	probs = torch.sigmoid(logits)
+	loss = -targets * torch.log(probs) - (1 - targets) * torch.log(torch.ones_like(probs) - probs)
+	return loss
 
 
 def load_feature_extraction_data(root_path, batch_size):
@@ -123,7 +147,7 @@ def load_feature_extraction_data(root_path, batch_size):
 		Normalize()])  # Convert images to range [-1, 1]
 
 	# Create data_set objects for each of the data splits
-	# Positive data
+	# Positive automatically labelled data
 	train_pos = GONetDataSet(root_path, "train", transform=transform)
 	val_pos = GONetDataSet(root_path, "vali", transform=transform)
 	test_pos = GONetDataSet(root_path, "test", transform=transform)
@@ -133,7 +157,7 @@ def load_feature_extraction_data(root_path, batch_size):
 
 	# Create DataLoaders for the data splits
 	loader_train = DataLoader(train_pos, batch_size=batch_size,
-							sampler=RandomSampler(train_pos), num_workers=WORKERS)
+							  sampler=RandomSampler(train_pos), num_workers=WORKERS)
 	loader_val = DataLoader(val_pos, batch_size=batch_size,
 							sampler=RandomSampler(val_pos), num_workers=WORKERS)
 	loader_test = DataLoader(test_pos, batch_size=batch_size,
@@ -162,7 +186,7 @@ def main():
 		plt.axis("off")
 		plt.title("Training Images")
 		plt.imshow(np.transpose(vutils.make_grid(real_batch[0].to(device)[:batch_size], padding=2,
-												 normalize=True).cpu(), (1, 2, 0)))
+												normalize=True).cpu(), (1, 2, 0)))
 		plt.show()
 
 	# Create the Generator and Discriminator networks
@@ -170,11 +194,16 @@ def main():
 	dis = Discriminator()
 
 	# Set up for training
-	optimizerG = optim.Adam(gen.parameters(), lr=lr_gen, betas=(beta1, 0.999))
-	optimizerD = optim.Adam(dis.parameters(), lr=lr_dis, betas=(beta1, 0.999))
-	loss = nn.BCELoss()
+	optimizer_g = optim.Adam(gen.parameters(), lr=lr_gen, betas=(beta1, 0.999))
+	optimizer_d = optim.Adam(dis.parameters(), lr=lr_dis, betas=(beta1, 0.999))
 
+	# can't use binary loss because Dis has been designed to output two values
+	# rather than one.
+	loss = nn.BCEWithLogitsLoss
 
+	# Train the DCGAN network
+	train_dcgan(gen, dis, optimizer_g, optimizer_d, loss, data_loaders["train"],
+				batch_size, nz, epochs=1, save_checkpoints=None)
 
 
 if __name__ == "__main__":

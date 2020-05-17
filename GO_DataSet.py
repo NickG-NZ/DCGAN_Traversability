@@ -76,8 +76,8 @@ class GONetDataSet(Dataset):
 			raise ValueError("To stop the program")
 		# --------------------------
 
-		# Place the folders in an arbitrary order for extracting images
-		# using indexes from 0 to the length of the dataset
+		# Place the folders in an arbitrary constant order for extracting images
+		# using indexes from 0 to the length of the data-set
 		folder_counts = sorted(self.folder_counts.items())
 		f_idx = 0
 		(folder, count) = folder_counts[f_idx]
@@ -124,7 +124,7 @@ class GONetDataSet(Dataset):
 		The keys of the dictionary depend on self.label (which can be "positive" or "mixed")
 		"""
 		subfolders = {"positive": ["positive_R", "positive_L"],
-						"mixed": ["positive_R", "positive_L", "negative_R", "negative_L"]}
+					"mixed": ["positive_R", "positive_L", "negative_R", "negative_L"]}
 		data_folders = {sub: os.path.join(self.split_dir, sub) for sub in subfolders[self.label]}
 		return data_folders
 
@@ -153,7 +153,7 @@ class Normalize:
 			raise TypeError("Normalize takes images as pytorch tensors")
 		if image.max() > 1.0 or image.min() < 0.0:
 			raise ValueError("Image should have been normalized to range [0.0, 1.0]")
-		image *= 2 - 1
+		image = (image * 2) - 1
 		return image
 
 
