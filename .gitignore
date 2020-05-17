@@ -1,4 +1,7 @@
 /GO_Data
+/GONet_weights
+GONet.py
+GONet_T.py
 /Kitti_Data
 .ipynb_checkpoints
 .pyc
