@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from torch.utils.data import sampler
 import torchvision.transforms as T
@@ -21,11 +22,10 @@ if USE_GPU and torch.cuda.is_available():
 else:
 	device = torch.device('cpu')
 
-
-"""Image constants"""
+# Image constants/Latent input vector size
 nz = 100
 
-#center of picture
+# center of picture
 xc = 310
 yc = 321
 
@@ -41,17 +41,129 @@ rsizey = 128
 # zeros
 outlist = np.zeros(15)
 
-
 class Generator(nn.Module):
 	"""Encodes images into a lower dimensional representation"""
 	def __init__(self):
 		super().__init__()
+		self.l0z = nn.Linear(nz, 8*8*512)
+		self.dc1 = nn.ConvTranspose2D(512, 256, 4, stride=2, pad=1)
+		self.dc2 = nn.ConvTranspose2D(256, 128, 4, stride=2, pad=1)
+		self.dc3 = nn.ConvTranspose2D(128, 64, 4, stride=2, pad=1)
+		self.dc4 = nn.ConvTranspose2D(64, 3, 4, stride=2, pad=1)
+		self.bn0l = nn.BatchNorm2D(8*8*512, eps=2e-05, momentum=0.1)
+		self.bn0 = nn.BatchNorm2D(512, eps=2e-05, momentum=0.1)
+		self.bn1 = nn.BatchNorm2D(256, eps=2e-05, momentum=0.1)
+		self.bn2 = nn.BatchNorm2D(128, eps=2e-05, momentum=0.1)
+		self.bn3 = nn.BatchNorm2D(64, eps=2e-05, momentum=0.1)
+ 
+	def forward(self, z):
+		h = torch.reshape(F.relu(self.bn0l(self.l0z(z))), (z.shape[0], 512, 8, 8))
+		h = F.relu(self.bn1(self.dc1(h)))
+		h = F.relu(self.bn2(self.dc2(h)))
+		h = F.relu(self.bn3(self.dc3(h)))
+		x = (self.dc4(h))
+		return x
 
-
-class invGen(nn.Module):
+class invG(nn.Module):
 	"""Generates fake images of how the scene should
 		appear if it is traversable"""
-
+	def __init__(self):
+		super().__init__()
+		self.c0 = nn.Conv2D(3, 64, 4, stride=2, pad=1)
+		self.c1 = nn.Conv2D(64, 128, 4, stride=2, pad=1)
+		self.c2 = nn.Conv2D(128, 256, 4, stride=2, pad=1)
+		self.c3 = nn.Conv2D(256, 512, 4, stride=2, pad=1)
+		self.l4l = nn.Linear(8*8*512, nz)
+		self.bn0 = nn.BatchNorm2D(64, eps=2e-05, momentum=0.1)
+		self.bn1 = nn.BatchNorm2D(128, eps=2e-05, momentum=0.1)
+		self.bn2 = nn.BatchNorm2D(256, eps=2e-05, momentum=0.1)
+		self.bn3 = nn.BatchNorm2D(512, eps=2e-05, momentum=0.1)
+	   
+	def forward(self, x):
+		h = F.relu(self.c0(x))
+		h = F.relu(self.bn1(self.c1(h)))
+		h = F.relu(self.bn2(self.c2(h))) 
+		h = F.relu(self.bn3(self.c3(h)))
+		l = self.l4l(h)
+		return l
 
 class Discriminator(nn.Module):
-	pass
+	"""Classifies whether the image input is generated or not """
+	def __init__(self):
+		super().__init__()
+		self.c0 = nn.Conv2D(3, 64, 4, stride=2, pad=1)
+		self.c1 = nn.Conv2D(64, 128, 4, stride=2, pad=1)
+		self.c2 = nn.Conv2D(128, 256, 4, stride=2, pad=1)
+		self.c3 = nn.Conv2D(256, 512, 4, stride=2, pad=1)
+		self.l4l = nn.Linear(8*8*512, 2)
+		self.bn0 = nn.BatchNorm2D(64, eps=2e-05, momentum=0.1)
+		self.bn1 = nn.BatchNorm2D(128, eps=2e-05, momentum=0.1)
+		self.bn2 = nn.BatchNorm2D(256, eps=2e-05, momentum=0.1)
+		self.bn3 = nn.BatchNorm2D(512, eps=2e-05, momentum=0.1)
+        
+	def forward(self, x):
+		h = nn.ELU(self.c0(x))
+		h = nn.ELU(self.bn1(self.c1(h)))
+		h = nn.ELU(self.bn2(self.c2(h))) 
+		h = nn.ELU(self.bn3(self.c3(h)))
+		l = self.l4l(h)
+		return h # not l?
+
+class Classification(nn.Module):
+	""" Classfication Module that consists of FC layers and LSTM to produce
+	the final output of traversability """
+	def __init__(self):
+		super().__init__()
+		self.l_img = nn.Linear(3*128*128, 10)
+		self.l_dis = nn.Linear(512*8*8, 10)
+		self.l_fdis = nn.Linear(512*8*8, 10)
+		self.l_LSTM = nn.LSTM(30, 30)
+		self.l_FL = nn.Linear(30, 1)
+		self.bnfl = nn.BatchNorm2D(2048*7*7, eps=2e-05, momentum=0.1)
+
+	def reset_state(self):
+		self.l_LSTM.reset_state()
+
+	def set_state(self):
+		self.l_LSTM.set_state()
+        
+	def forward(self, img_error, dis_error, dis_output):
+		h = torch.reshape(torch.abs(img_error), (img_error.shape[0], 3*128*128))
+		h = self.l_img(h)
+		g = torch.reshape(torch.abs(dis_error), (dis_error.shape[0], 512*8*8))
+		g = self.l_dis(g)
+		f = torch.reshape(dis_output, (dis_output.shape[0], 512*8*8))
+		f = self.l_fdis(f)
+		con = torch.cat((h,g,f), dim=1)
+		ls = self.l_LSTM(con)
+		ghf = torch.sigmoid(self.l_FL(ls))
+		return ghf
+
+def weights_init(m):
+	"""Weight initialization for all Conv, BatchNorm and Linear layers"""
+	classname = m.__class__.__name__
+	if classname.find('Conv') != -1:
+		nn.init.normal_(m.weight.data, 0.0, 0.02)
+	elif classname.find("BatchNorm") != -1:
+		nn.init.normal_(m.weight.data, 0.0, 0.02)
+		nn.init.constant_(m.bias.data, 0)
+	elif classname.find("Linear") != -1:
+		nn.init.normal_(m.weight.data, 0.0, 0.02)
+
+def main():
+	# check current device in use
+	print("Using device:", device)
+
+	# initialize model
+	gen = Generator().to(device)
+	gen.apply(weights_init)
+	invg = invG().to(device)
+	invg.apply(weights_init)
+	dis = Discriminator().to(device)
+	dis.apply(weights_init)
+	fl = FL().to(device)
+	fl.apply(weights_init)
+
+
+if __name__ == "__main__":
+	main()
