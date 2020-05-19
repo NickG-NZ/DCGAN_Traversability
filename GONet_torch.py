@@ -53,9 +53,5 @@ class invGen(nn.Module):
 		appear if it is traversable"""
 
 
-def main():
-	print(f"Using device: {device}")
-
-
-if __name__ == "__main__":
-	main()
+class Discriminator(nn.Module):
+	pass
