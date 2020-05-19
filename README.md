@@ -6,6 +6,7 @@ Using a DCGAN to classify scenes as traversible for mobile robots
 - pytorch=1.4.0
 - Pillow=7.1.2
 - chainer=5.3.0
+- torchvision=0.5.0
 - Potentially more to come
 
 ## Installation with Conda
@@ -16,7 +17,7 @@ Using a DCGAN to classify scenes as traversible for mobile robots
 2. Install the dependencies into the environment
 ```conda install Pillow=7.1.2```
 3. Check the installed dependencies
-```conda env list```
+```conda list```
 4. You're good to go. If you want to deactivate the environment
 ```conda deactivate```
 
