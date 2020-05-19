@@ -165,14 +165,13 @@ This prevents extreme extrapolation behavior in the discriminator
 - Flip the labels and loss function when training the generator.
 - Sample Gaussian random numbers as input to the generator.
 - Use mini batches of all real or all fake for calculating batch norm statistics.
-- Use Leaky ReLU in the generator and discriminator.
+- Use Leaky ReLU in the discriminator.
 - Use Average pooling and stride for downsampling; use ConvTranspose2D and stride for upsampling.
 - Use label smoothing in the discriminator, with small random noise.
 - Add random noise to the labels in the discriminator.
 - Use DCGAN architecture, unless you have a good reason not to.
 - A loss of 0.0 in the discriminator is a failure mode.
 - If loss of the generator steadily decreases, it is likely fooling the discriminator with garbage images.
-- Use labels if you have them.
 - Add noise to inputs to the discriminator and decay the noise over time.
 - Use dropout of 50 percent during train and generation.
 
@@ -180,5 +179,6 @@ This prevents extreme extrapolation behavior in the discriminator
 - Try different input noise vector (z) sizes e.g. 100, 128, 256
 - Use small batch sizes (8, 16, 32, 64)
 - Spectral normalization
+- Virtual batch normalization
 - Try Wasserstein loss Ld = D(x) - D(G(z)), Lg = -D(G(z))
 - Set beta1 for Adam = 0.5

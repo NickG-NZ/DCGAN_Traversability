@@ -23,7 +23,6 @@ class GONetDataSet(Dataset):
 
 	This class constructs a Pytorch Dataset object corresponding to a single one of the 6 folders listed above.
 	The unlabelled data is not used in any dataset objects that are created.
-
 	Args:
 	- root_dir (string): Absolute path to directory with image folders
 	- split (string): "train", "vali" or "test"
@@ -40,7 +39,8 @@ class GONetDataSet(Dataset):
 
 		self._check_directories_valid()
 		self.data_folders = self._get_data_dirs()  # dict of paths for each subfolder
-		self.folder_counts = self.num_images_in_folders()  # dict of num imgs in each subfolder
+		self.folder_counts = self._num_images_in_folders()  # dict of num imgs in each subfolder
+		self.length = self._save_length()  # save length for faster lookup
 		self.transform = transform
 
 	def __len__(self):
@@ -48,33 +48,20 @@ class GONetDataSet(Dataset):
 		Returns the number of images in this instance
 		of the dataset
 		"""
-		num_images = 0
-		for _, count in self.num_images_in_folders().items():
-			num_images += count
-		return num_images
+		return self.length
 
 	def __getitem__(self, idx):
 		"""
 		Creates a mapping between integer idx and images in the data_folders
-
 		Inputs:
 		- idx: an index from a Sampler corresponding to a particular image
-
 		Returns:
 		- (image, label): (tuple) contains the processed image, and label is either 0.0 or 1.0
 						for negative and positve images respectively
 		"""
 		idx_list = []
 		if torch.is_tensor(idx):
-			idx_list = idx.tolist()
-			idx = idx_list[0]
-
-		# Debugging code (delete later)
-		# -----------------------------
-		if len(idx_list) > 1:
-			print("idx has more than one item")
-			raise ValueError("To stop the program")
-		# --------------------------
+			idx = idx.tolist()[0]
 
 		# Place the folders in an arbitrary constant order for extracting images
 		# using indexes from 0 to the length of the data-set
@@ -91,9 +78,21 @@ class GONetDataSet(Dataset):
 		img_path = os.path.join(folder_path, os.listdir(folder_path)[idx])
 
 		# Load image and apply transforms from Compose object
-		img = self.transform(Image.open(img_path))
+		img = Image.open(img_path)
+		if self.transform:
+			img = self.transform(img)
 		label = 1.0 if "positive" in folder else 0.0
 		return img, label
+
+	def _save_length(self):
+		"""
+		Calculates and saves the length for fast reference
+		in the future
+		"""
+		num_images = 0
+		for _, count in self.folder_counts.items():
+			num_images += count
+		return num_images
 
 	def _split_folder_name(self):
 		"""
@@ -128,7 +127,7 @@ class GONetDataSet(Dataset):
 		data_folders = {sub: os.path.join(self.split_dir, sub) for sub in subfolders[self.label]}
 		return data_folders
 
-	def num_images_in_folders(self):
+	def _num_images_in_folders(self):
 		"""
 		Returns a dict with the number of images in each of the folders in self.data_folders
 		"""

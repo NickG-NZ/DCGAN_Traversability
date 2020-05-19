@@ -18,7 +18,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from GO_DataSet import GONetDataSet, Normalize, display_num_images
-from GONet_torch import Generator, Discriminator
+from GONet_torch import Generator, Discriminator, weights_init
 
 # ********* Change these paths for your computer **********************
 DATA_PATH = "/home/nick/Documents/Conv_NN_CS231n/Project/DCGAN_Traversability/GO_Data"
@@ -27,8 +27,9 @@ USE_GPU = False
 DTYPE = torch.float32
 WORKERS = 0  # number of threads for Dataloaders (0 = singlethreaded)
 IMAGE_SIZE = 128
-RANDOM_SEED = 222
+RANDOM_SEED = 291
 PRINT_EVERY = 50  # num iterations between printing learning stats
+SAVE_EVERY = 1  # num iterations to save weights
 
 if USE_GPU and torch.cuda.is_available():
 	device = torch.device('cuda')
@@ -38,6 +39,15 @@ print(f"using device: {device}")
 
 torch.manual_seed(RANDOM_SEED)
 
+# Hyper parameters
+########################################
+beta1 = 0.5  # For ADAM optimizer
+batch_size = 64
+num_epochs = 1
+lr_gen = 0.0004
+lr_dis = 0.0001
+from GONet_torch import nz  # size of latent vector z
+#######################################
 
 def train_dcgan(gen, dis, optimizer_g, optimizer_d, loss_fn, loader_train, loader_val,
 				batch_size, nz, epochs=1, save_checkpoints=None):
@@ -219,14 +229,6 @@ def load_feature_extraction_data(root_path, batch_size):
 
 def main():
 	"""Run training of DCGAN"""
-	# Hyper parameters
-	beta1 = 0.5  # For ADAM optimizer
-	batch_size = 64
-	nz = 100  # size of latent vector z
-	num_epochs = 1
-	lr_gen = 0.0004
-	lr_dis = 0.0001
-
 	data_loaders, data_sets = load_feature_extraction_data(DATA_PATH, batch_size)
 
 	# plot some training examples
@@ -242,20 +244,21 @@ def main():
 
 	# Create the Generator and Discriminator networks
 	gen = Generator()
+	gen.apply(weights_init)
 	dis = Discriminator()
+	dis.apply(weights_init)
 
 	# Set up for training
 	optimizer_g = optim.Adam(gen.parameters(), lr=lr_gen, betas=(beta1, 0.999))
 	optimizer_d = optim.Adam(dis.parameters(), lr=lr_dis, betas=(beta1, 0.999))
 
-	# can't use binary loss because Dis has been designed to output two values
-	# rather than one.
+	# Combines a sigmoid (converts logits to probabilites) with Binary cross-entropy loss
 	loss = nn.BCEWithLogitsLoss
 
 	# Train the DCGAN network
 	gen_test_imgs, gen_loss_hist, dis_loss_hist, dis_acc_hist = \
 		train_dcgan(gen, dis, optimizer_g, optimizer_d, loss, data_loaders["train"],
-		            data_loaders["val"], batch_size, nz, epochs=1, save_checkpoints=None)
+		            data_loaders["val"], batch_size, nz, epochs=1, save_checkpoints=SAVE_EVERY)
 
 	# Plot loss
 	plt.figure(figsize=(10,5))

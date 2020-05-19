@@ -1,18 +1,14 @@
-"""A pytorch implementation of GONet"""
+"""
+A pytorch implementation of GONet
+@author Rongfei Lu
+"""
 
-import sys
 import numpy as np
-from PIL import Image
-import matplotlib.pyplot as plt
 
 # torch
 import torch
 import torch.nn as nn
-import torch.optim as optim
 import torch.nn.functional as F
-from torch.utils.data import DataLoader
-from torch.utils.data import sampler
-import torchvision.transforms as T
 
 
 USE_GPU = True
@@ -42,19 +38,22 @@ rsizey = 128
 outlist = np.zeros(15)
 
 class Generator(nn.Module):
-	"""Encodes images into a lower dimensional representation"""
+	"""
+	Generates fake images of how the scene should
+	appear if it is traversable
+	"""
 	def __init__(self):
 		super().__init__()
 		self.l0z = nn.Linear(nz, 8*8*512)
-		self.dc1 = nn.ConvTranspose2D(512, 256, 4, stride=2, pad=1)
-		self.dc2 = nn.ConvTranspose2D(256, 128, 4, stride=2, pad=1)
-		self.dc3 = nn.ConvTranspose2D(128, 64, 4, stride=2, pad=1)
-		self.dc4 = nn.ConvTranspose2D(64, 3, 4, stride=2, pad=1)
-		self.bn0l = nn.BatchNorm2D(8*8*512, eps=2e-05, momentum=0.1)
-		self.bn0 = nn.BatchNorm2D(512, eps=2e-05, momentum=0.1)
-		self.bn1 = nn.BatchNorm2D(256, eps=2e-05, momentum=0.1)
-		self.bn2 = nn.BatchNorm2D(128, eps=2e-05, momentum=0.1)
-		self.bn3 = nn.BatchNorm2D(64, eps=2e-05, momentum=0.1)
+		self.dc1 = nn.ConvTranspose2d(512, 256, 4, stride=2, padding=1)
+		self.dc2 = nn.ConvTranspose2d(256, 128, 4, stride=2, padding=1)
+		self.dc3 = nn.ConvTranspose2d(128, 64, 4, stride=2, padding=1)
+		self.dc4 = nn.ConvTranspose2d(64, 3, 4, stride=2, padding=1)
+		self.bn0l = nn.BatchNorm2d(8*8*512, eps=2e-05, momentum=0.1)
+		self.bn0 = nn.BatchNorm2d(512, eps=2e-05, momentum=0.1)
+		self.bn1 = nn.BatchNorm2d(256, eps=2e-05, momentum=0.1)
+		self.bn2 = nn.BatchNorm2d(128, eps=2e-05, momentum=0.1)
+		self.bn3 = nn.BatchNorm2d(64, eps=2e-05, momentum=0.1)
  
 	def forward(self, z):
 		h = torch.reshape(F.relu(self.bn0l(self.l0z(z))), (z.shape[0], 512, 8, 8))
@@ -64,20 +63,21 @@ class Generator(nn.Module):
 		x = (self.dc4(h))
 		return x
 
-class invG(nn.Module):
-	"""Generates fake images of how the scene should
-		appear if it is traversable"""
+class InvGen(nn.Module):
+	"""
+	Encodes images into a lower dimensional representation (size nz)
+	"""
 	def __init__(self):
 		super().__init__()
-		self.c0 = nn.Conv2D(3, 64, 4, stride=2, pad=1)
-		self.c1 = nn.Conv2D(64, 128, 4, stride=2, pad=1)
-		self.c2 = nn.Conv2D(128, 256, 4, stride=2, pad=1)
-		self.c3 = nn.Conv2D(256, 512, 4, stride=2, pad=1)
+		self.c0 = nn.Conv2d(3, 64, 4, stride=2, padding=1)
+		self.c1 = nn.Conv2d(64, 128, 4, stride=2, padding=1)
+		self.c2 = nn.Conv2d(128, 256, 4, stride=2, padding=1)
+		self.c3 = nn.Conv2d(256, 512, 4, stride=2, padding=1)
 		self.l4l = nn.Linear(8*8*512, nz)
-		self.bn0 = nn.BatchNorm2D(64, eps=2e-05, momentum=0.1)
-		self.bn1 = nn.BatchNorm2D(128, eps=2e-05, momentum=0.1)
-		self.bn2 = nn.BatchNorm2D(256, eps=2e-05, momentum=0.1)
-		self.bn3 = nn.BatchNorm2D(512, eps=2e-05, momentum=0.1)
+		self.bn0 = nn.BatchNorm2d(64, eps=2e-05, momentum=0.1)
+		self.bn1 = nn.BatchNorm2d(128, eps=2e-05, momentum=0.1)
+		self.bn2 = nn.BatchNorm2d(256, eps=2e-05, momentum=0.1)
+		self.bn3 = nn.BatchNorm2d(512, eps=2e-05, momentum=0.1)
 	   
 	def forward(self, x):
 		h = F.relu(self.c0(x))
@@ -89,25 +89,31 @@ class invG(nn.Module):
 
 class Discriminator(nn.Module):
 	"""Classifies whether the image input is generated or not """
-	def __init__(self):
+	def __init__(self, mode='train'):
 		super().__init__()
-		self.c0 = nn.Conv2D(3, 64, 4, stride=2, pad=1)
-		self.c1 = nn.Conv2D(64, 128, 4, stride=2, pad=1)
-		self.c2 = nn.Conv2D(128, 256, 4, stride=2, pad=1)
-		self.c3 = nn.Conv2D(256, 512, 4, stride=2, pad=1)
-		self.l4l = nn.Linear(8*8*512, 2)
-		self.bn0 = nn.BatchNorm2D(64, eps=2e-05, momentum=0.1)
-		self.bn1 = nn.BatchNorm2D(128, eps=2e-05, momentum=0.1)
-		self.bn2 = nn.BatchNorm2D(256, eps=2e-05, momentum=0.1)
-		self.bn3 = nn.BatchNorm2D(512, eps=2e-05, momentum=0.1)
+		self.mode = mode
+		self.c0 = nn.Conv2d(3, 64, 4, stride=2, padding=1)
+		self.c1 = nn.Conv2d(64, 128, 4, stride=2, padding=1)
+		self.c2 = nn.Conv2d(128, 256, 4, stride=2, padding=1)
+		self.c3 = nn.Conv2d(256, 512, 4, stride=2, padding=1)
+		# self.l4l = nn.Linear(8*8*512, 2)\
+		self.l4l = nn.Linear(8*8*512, 1)
+		self.bn0 = nn.BatchNorm2d(64, eps=2e-05, momentum=0.1)
+		self.bn1 = nn.BatchNorm2d(128, eps=2e-05, momentum=0.1)
+		self.bn2 = nn.BatchNorm2d(256, eps=2e-05, momentum=0.1)
+		self.bn3 = nn.BatchNorm2d(512, eps=2e-05, momentum=0.1)
         
 	def forward(self, x):
-		h = nn.ELU(self.c0(x))
-		h = nn.ELU(self.bn1(self.c1(h)))
-		h = nn.ELU(self.bn2(self.c2(h))) 
-		h = nn.ELU(self.bn3(self.c3(h)))
-		l = self.l4l(h)
-		return h # not l?
+		h = F.elu(self.c0(x))
+		h = F.elu(self.bn1(self.c1(h)))
+		h = F.elu(self.bn2(self.c2(h)))
+		h = F.elu(self.bn3(self.c3(h)))
+		flat = torch.reshape(h, (h.shape[0], 8*8*512))
+		l = self.l4l(flat)
+		if self.mode == 'train':
+			return l
+		else:
+			return h
 
 class Classification(nn.Module):
 	""" Classfication Module that consists of FC layers and LSTM to produce
@@ -119,7 +125,7 @@ class Classification(nn.Module):
 		self.l_fdis = nn.Linear(512*8*8, 10)
 		self.l_LSTM = nn.LSTM(30, 30)
 		self.l_FL = nn.Linear(30, 1)
-		self.bnfl = nn.BatchNorm2D(2048*7*7, eps=2e-05, momentum=0.1)
+		self.bnfl = nn.BatchNorm2d(2048*7*7, eps=2e-05, momentum=0.1)
 
 	def reset_state(self):
 		self.l_LSTM.reset_state()
@@ -157,11 +163,11 @@ def main():
 	# initialize model
 	gen = Generator().to(device)
 	gen.apply(weights_init)
-	invg = invG().to(device)
+	invg = InvGen().to(device)
 	invg.apply(weights_init)
 	dis = Discriminator().to(device)
 	dis.apply(weights_init)
-	fl = FL().to(device)
+	fl = Classification().to(device)
 	fl.apply(weights_init)
 
 
