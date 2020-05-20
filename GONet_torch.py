@@ -49,7 +49,7 @@ class Generator(nn.Module):
 		self.dc2 = nn.ConvTranspose2d(256, 128, 4, stride=2, padding=1)
 		self.dc3 = nn.ConvTranspose2d(128, 64, 4, stride=2, padding=1)
 		self.dc4 = nn.ConvTranspose2d(64, 3, 4, stride=2, padding=1)
-		self.bn0l = nn.BatchNorm2d(8*8*512, eps=2e-05, momentum=0.1)
+		self.bn0l = nn.BatchNorm1d(8*8*512, eps=2e-05, momentum=0.1)
 		self.bn0 = nn.BatchNorm2d(512, eps=2e-05, momentum=0.1)
 		self.bn1 = nn.BatchNorm2d(256, eps=2e-05, momentum=0.1)
 		self.bn2 = nn.BatchNorm2d(128, eps=2e-05, momentum=0.1)
@@ -108,7 +108,7 @@ class Discriminator(nn.Module):
 		h = F.elu(self.bn1(self.c1(h)))
 		h = F.elu(self.bn2(self.c2(h)))
 		h = F.elu(self.bn3(self.c3(h)))
-		flat = torch.reshape(h, (h.shape[0], 8*8*512))
+		flat = h.view(h.shape[0], -1)
 		l = self.l4l(flat)
 		if self.mode == 'train':
 			return l

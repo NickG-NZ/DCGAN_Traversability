@@ -34,14 +34,15 @@ class GONetDataSet(Dataset):
 		self.root_dir = root_dir
 		self.split = split
 		self.label = label
-		self.split_name = self._split_folder_name()  # (string) top level folder of selected split
-		self.split_dir = os.path.join(self.root_dir, self.split_name)
-
-		self._check_directories_valid()
-		self.data_folders = self._get_data_dirs()  # dict of paths for each subfolder
-		self.folder_counts = self._num_images_in_folders()  # dict of num imgs in each subfolder
-		self.length = self._save_length()  # save length for faster lookup
 		self.transform = transform
+
+		self.split_name = self._split_folder_name()  # (string) name of folder for selected split
+		self.split_dir = os.path.join(self.root_dir, self.split_name) # path to top level folder of selected split
+		self._check_directories_valid()
+		self.data_folder_paths = self._get_data_dirs()  # dict of paths for each subfolder
+		self.folder_counts = self._num_images_in_folders()  # list of tuples, num imgs in each subfolder
+		self.image_name_lists = self._get_image_names()
+		self.length = self._save_length()  # save length for faster lookup
 
 	def __len__(self):
 		"""
@@ -59,23 +60,22 @@ class GONetDataSet(Dataset):
 		- (image, label): (tuple) contains the processed image, and label is either 0.0 or 1.0
 						for negative and positve images respectively
 		"""
-		idx_list = []
 		if torch.is_tensor(idx):
 			idx = idx.tolist()[0]
 
-		# Place the folders in an arbitrary constant order for extracting images
+		# The folders are in an arbitrary constant order for extracting images
 		# using indexes from 0 to the length of the data-set
-		folder_counts = sorted(self.folder_counts.items())
 		f_idx = 0
-		(folder, count) = folder_counts[f_idx]
+		(folder, count) = self.folder_counts[f_idx]
 		while idx > count:
 			idx -= count  # start idx at beginning of next folder
 			f_idx += 1
-			if f_idx > len(folder_counts)-1:
+			if f_idx > len(self.folder_counts)-1:
 				raise IndexError("index requested from the dataset exceeds dataset length")
-			(folder, count) = folder_counts[f_idx]
-		folder_path = self.data_folders[folder]
-		img_path = os.path.join(folder_path, os.listdir(folder_path)[idx])
+			(folder, count) = self.folder_counts[f_idx]
+		folder_path = self.data_folder_paths[folder]
+		img_name = self.image_name_lists[folder][idx]
+		img_path = os.path.join(folder_path, img_name)
 
 		# Load image and apply transforms from Compose object
 		img = Image.open(img_path)
@@ -90,9 +90,9 @@ class GONetDataSet(Dataset):
 		in the future
 		"""
 		num_images = 0
-		for _, count in self.folder_counts.items():
+		for _, count in self.folder_counts:
 			num_images += count
-		return num_images
+		return num_images - 1
 
 	def _split_folder_name(self):
 		"""
@@ -124,17 +124,32 @@ class GONetDataSet(Dataset):
 		"""
 		subfolders = {"positive": ["positive_R", "positive_L"],
 					"mixed": ["positive_R", "positive_L", "negative_R", "negative_L"]}
-		data_folders = {sub: os.path.join(self.split_dir, sub) for sub in subfolders[self.label]}
-		return data_folders
+		data_folder_paths = {sub: os.path.join(self.split_dir, sub) for sub in subfolders[self.label]}
+		return data_folder_paths
 
 	def _num_images_in_folders(self):
 		"""
-		Returns a dict with the number of images in each of the folders in self.data_folders
+		Returns a list of tuples with the number of images in each of
+		the folders in self.data_folders
+		[(folder_name, count), ...]
 		"""
 		folder_counts = {}
-		for name, folder_path in self.data_folders.items():
+		for name, folder_path in self.data_folder_paths.items():
 			folder_counts[name] = len(os.listdir(folder_path))
+		folder_counts = sorted(folder_counts.items())  # place folders in arbitrary sorted order
 		return folder_counts
+
+	def _get_image_names(self):
+		"""
+		Saves the names of images in each folder in a list
+		for quick reference by self.__getitem__
+		Returns a dict of {folder_name: [image_names_list]...}
+		"""
+		image_name_lists = {}
+		for name, path in self.data_folder_paths.items():
+			image_name_lists[name] = os.listdir(path)
+		return image_name_lists
+
 
 
 class Normalize:
@@ -168,5 +183,5 @@ def display_num_images(data_sets):
 		name = dataset.split_name
 		print("\n")
 		print(f"Dataset: {name}")
-		for folder, count in dataset.folder_counts.items():
+		for folder, count in dataset.folder_counts:
 			print(f"num images in {folder} folder = {count}")
