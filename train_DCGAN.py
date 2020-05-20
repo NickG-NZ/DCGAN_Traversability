@@ -5,6 +5,7 @@ Training code for GONet DCGAN
 import sys
 import os
 import argparse
+import time
 
 import torch
 import torch.nn as nn
@@ -28,9 +29,10 @@ DTYPE = torch.float32
 WORKERS = 0  # number of threads for Dataloaders (0 = singlethreaded)
 IMAGE_SIZE = 128
 RANDOM_SEED = 291
-PRINT_EVERY = 5  # num iterations between printing learning stats
-SAVE_EVERY = 1  # num epochs to save weights
-TEST_GEN_EVERY = 10  # how often (in iterations) to check gen on the fixed noise
+PRINT_EVERY = 20  # num iterations between printing learning stats
+SAVE_EVERY = 50  # num iterations to save weights after (Assign to 'None' to turn off)
+SAVE_TIME_INTERVAL = 60 * 20  # save model every 20 minutes
+TEST_GEN_EVERY = 30  # how often (in iterations) to check images gen creates from the fixed noise
 
 if USE_GPU and torch.cuda.is_available():
 	device = torch.device('cuda')
@@ -39,6 +41,7 @@ else:
 print(f"using device: {device}")
 
 torch.manual_seed(RANDOM_SEED)
+
 
 # Hyper parameters
 ########################################
@@ -50,6 +53,7 @@ lr_dis = 0.0001
 from GONet_torch import nz  # size of latent vector z
 label_smoothing_start = 15  # what iteration to start label smoothing
 #######################################
+
 
 def train_dcgan(gen, dis, optimizer_g, optimizer_d, loss_fn, loader_train, loader_val):
 	"""
@@ -86,11 +90,11 @@ def train_dcgan(gen, dis, optimizer_g, optimizer_d, loss_fn, loader_train, loade
 	gen.train()  # put the networks in training mode
 	dis.train()
 
+	tic = time.perf_counter()  # start timer for model saves
+	timed_save = False
 	print("\nStarting Training of DCGAN")
 	for e in range(num_epochs):
-		count = 0
 		for t, (x, y) in enumerate(loader_train):
-			count += 1
 			x = x.to(device=device, dtype=DTYPE)
 
 			# Perform Dis training update ( minimize -ylog(D(x)) - (1-y)log(1-D(G(z)) )
@@ -98,7 +102,7 @@ def train_dcgan(gen, dis, optimizer_g, optimizer_d, loss_fn, loader_train, loade
 			dis.zero_grad()
 
 			# create labels for real images  w/ one-sided label smoothing
-			labels = smooth_labels(count, e)
+			labels = smooth_labels(t, e)
 			logits = dis(x)  # real_scores
 			loss_dis_real = loss_fn(logits, labels)
 			loss_dis_real.backward()  # compute gradients
@@ -124,24 +128,35 @@ def train_dcgan(gen, dis, optimizer_g, optimizer_d, loss_fn, loader_train, loade
 			gen_loss_hist.append(loss_gen.item())
 			optimizer_g.step()
 
-			if count % PRINT_EVERY == 0:
+			if t % PRINT_EVERY == 0:
 				# Calculate performance stats and display them
 				dis_acc_real = evaluate_accuracy(dis, loader_val)
 				dis_acc_hist.append(dis_acc_real)
-				print(f"Epoch: {e}/{num_epochs}\t Iteration: {count}\nDis loss: {dis_loss_hist[-1]:.3f} | "
+				print(f"Epoch: {e}/{num_epochs}\t Iteration: {t}\nDis loss: {dis_loss_hist[-1]:.3f} | "
 						f"Gen loss: {gen_loss_hist[-1]:.3f} | Dis accuracy (real images): {dis_acc_hist[-1]:.3f}")
 
-			if count % TEST_GEN_EVERY == 0 or  ((e == num_epochs - 1) and t == len(loader_train) - 1):
+			if (t + 1) % TEST_GEN_EVERY == 0 or ((e == num_epochs - 1) and t == len(loader_train) - 1):
 				# Create images using gen to visualize progress
 				with torch.no_grad():
 					ims = gen(fixed_latent_vectors).detach()
 				gen_test_imgs.append(vutils.make_grid(ims, padding=2, normalize=True))
+				# *** uncomment to see images produced by gen during training (unlikely to work on remote server) ***
+				# plt.imshow(np.transpose(gen_test_imgs[-1].cpu(), (1, 2, 0)))
+				# plt.show()
 
-		if SAVE_EVERY:
-			if e % SAVE_EVERY == 0 or (e == num_epochs - 1):
+			# Check if time to save model
+			toc = time.perf_counter()
+			time_diff = toc - tic
+			if time_diff > SAVE_TIME_INTERVAL:
+				tic = time.perf_counter()  # reset clock
+				timed_save = True
+				print("Timed save")
+
+			if (SAVE_EVERY and (t + 1) % SAVE_EVERY == 0) or timed_save:
 				# Save the model weights in a folder labelled with the validation accuracy
 				save_model_params(gen, "gen", SAVE_PATH, e, gen_loss_hist[-1])
 				save_model_params(dis, "dis", SAVE_PATH, e, dis_loss_hist[-1])
+				timed_save = False
 
 	return gen_test_imgs, gen_loss_hist, dis_loss_hist, dis_acc_hist
 
@@ -259,8 +274,6 @@ def main():
 	dis = Discriminator()
 	dis.apply(weights_init)
 
-	acc = evaluate_accuracy(dis, data_loaders["val"], num_eval=500)
-
 	# Set up for training
 	optimizer_g = optim.Adam(gen.parameters(), lr=lr_gen, betas=(beta1, 0.999))
 	optimizer_d = optim.Adam(dis.parameters(), lr=lr_dis, betas=(beta1, 0.999))
@@ -288,7 +301,7 @@ def main():
 	plt.subplot(1, 2, 1)
 	plt.axis("off")
 	plt.title("Real Images")
-	plt.imshow(np.transpose(vutils.make_grid(real_batch[0].to(device)[:batch_size], padding=5,
+	plt.imshow(np.transpose(vutils.make_grid(real_batch[0].to(device)[:batch_size], padding=2,
 	                                         normalize=True).cpu(), (1, 2, 0)))
 	# Plot the fake images from the last epoch
 	plt.subplot(1, 2, 2)
