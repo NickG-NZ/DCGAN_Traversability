@@ -97,19 +97,20 @@ def train_dcgan(gen, dis, optimizer_g, optimizer_d, loss_fn, loader_train, loade
 	for e in range(num_epochs):
 		for t, (x, y) in enumerate(loader_train):
 			x = x.to(device=device, dtype=DTYPE)
+			num_ims = x.shape()[0]  # this should equal batch size except for last batch in epoch
 
 			# Perform Dis training update ( minimize -ylog(D(x)) - (1-y)log(1-D(G(z)) )
 			# 1) Classify a real data batch using Dis
 			dis.zero_grad()
 
 			# create labels for real images  w/ one-sided label smoothing
-			labels = smooth_labels(t, e)
+			labels = smooth_labels(t, e, num_ims)
 			logits = dis(x)  # real_scores
 			loss_dis_real = loss_fn(logits, labels)
 			loss_dis_real.backward()  # compute gradients
 
 			# 2) Classify a fake data batch (from Gen) using Dis
-			z = torch.randn((batch_size, nz), device=device)
+			z = torch.randn((num_ims, nz), device=device)
 			fake_imgs = gen(z)
 			labels.fill_(0.0)  # create labels for fake images (no smoothing)
 			logits = dis(fake_imgs.detach())  # detach() stops gradients being propagated through gen()
@@ -162,7 +163,7 @@ def train_dcgan(gen, dis, optimizer_g, optimizer_d, loss_fn, loader_train, loade
 	return gen_test_imgs, gen_loss_hist, dis_loss_hist, dis_acc_hist
 
 
-def smooth_labels(iteration, epoch):
+def smooth_labels(iteration, epoch, num_labels):
 	"""
 	Creates labels using one-sided label smoothing
 	"""
@@ -170,7 +171,7 @@ def smooth_labels(iteration, epoch):
 		smoothing = 0.9  # replace the true label (1.0) with a less exact label
 	else:
 		smoothing = 1.0  # use true label for first few iterations
-	return torch.full((batch_size, 1), smoothing, device=device, dtype=DTYPE)
+	return torch.full((num_labels, 1), smoothing, device=device, dtype=DTYPE)
 
 
 def evaluate_accuracy(model, data_loader, num_eval=500):
@@ -244,11 +245,11 @@ def load_feature_extraction_data(root_path):
 	display_num_images(data_sets)
 
 	# Create DataLoaders for the data splits
-	loader_train = DataLoader(train_pos, batch_size=batch_size,
+	loader_train = DataLoader(train_pos, batch_size=batch_size, drop_last=True,
 							  sampler=RandomSampler(train_pos), num_workers=WORKERS)
-	loader_val = DataLoader(val_pos, batch_size=batch_size,
+	loader_val = DataLoader(val_pos, batch_size=batch_size, drop_last=True,
 							sampler=RandomSampler(val_pos), num_workers=WORKERS)
-	loader_test = DataLoader(test_pos, batch_size=batch_size,
+	loader_test = DataLoader(test_pos, batch_size=batch_size, drop_last=True,
 							 sampler=RandomSampler(test_pos), num_workers=WORKERS)
 	data_loaders = {"train": loader_train, "val": loader_val, "test": loader_test}
 	return data_loaders, data_sets
