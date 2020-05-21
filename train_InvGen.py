@@ -25,13 +25,15 @@ from utils import Normalize, display_num_images, save_model_params, load_model_p
 # ********* Change these paths for your computer **********************
 DATA_PATH = "/home/nick/Documents/Conv_NN_CS231n/Project/DCGAN_Traversability/GO_Data"
 SAVE_PATH = "/home/nick/Documents/Conv_NN_CS231n/Project/DCGAN_Traversability/Training_Checkpoints/Autoencoder"
-MODELS_LOAD_PATH = "/home/nick/Documents/Conv_NN_CS231n/Project/DCGAN_Traversability/Training_Checkpoints/DCGAN"
+LOAD_PATH = "/home/nick/Documents/Conv_NN_CS231n/Project/DCGAN_Traversability/Training_Checkpoints/DCGAN"
+GEN_FILE = "gen_params__loss0.89127_epoch0"
+DIS_FILE = "dis_params__loss1.40223_epoch0"
 USE_GPU = True
 DTYPE = torch.float32
 WORKERS = 0  # number of threads for Dataloaders (0 = singlethreaded)
 IMAGE_SIZE = 128
 # RANDOM_SEED = 291
-PRINT_EVERY = 20  # num iterations between printing learning stats
+PRINT_EVERY = 1cd  # num iterations between printing learning stats
 SAVE_EVERY = 50  # num iterations to save weights after (Assign to 'None' to turn off)
 SAVE_TIME_INTERVAL = 60 * 20  # save model every 20 minutes
 TEST_GEN_EVERY = 30  # how often (in iterations) to check images created by Gen(InvGen(I))
@@ -51,7 +53,6 @@ beta1 = 0.9  # Different to GAN
 batch_size = 64
 num_epochs = 1
 lr_invgen = 0.0004
-from GONet_torch import nz  # size of latent vector z
 lmbda = 0.5  # tuning parameter for invgen loss function L(z) = (1-lmbda)*Lr + lmbda*Ld
 			# Lr = ||I - Gen(z)||, Ld = ||f(I) - f(Gen(z))||
 #######################################
@@ -98,14 +99,14 @@ def train_invgen(invgen, gen, dis, optimizer, loss_fn, loader_train, loader_val)
 			dis.zero_grad()
 			gen.zero_grad()
 
-			z = invgen(x)  # create batch of latent vectors from btach of images
+			z = invgen(x)  # create batch of latent vectors from batch of images
 			fake_imgs = gen(z)
 			dis_features_fake = dis(fake_imgs)  # last conv layer of dis
 			dis_features_real = dis(x)
-			loss = loss_fn(x, fake_imgs, dis_features_fake, dis_features_real, lmbda)
+			loss = loss_fn(x, fake_imgs, dis_features_fake, dis_features_real)
 
 			# Perform update
-			loss_hist.append(loss)
+			loss_hist.append(loss.item())
 			loss.backward()
 			optimizer.step()
 
@@ -113,7 +114,7 @@ def train_invgen(invgen, gen, dis, optimizer, loss_fn, loader_train, loader_val)
 				# Calculate performance stats and display them
 				im_residuals = abs(x - fake_imgs).sum().item()
 				print(f"Epoch: {e}/{num_epochs}\t Iteration: {t}\n"f"InvGen loss: {loss_hist[-1]:.3f}"
-				      f"Image reiduals (I - I'): {im_residuals:.3f}")
+				      f" Image residuals (I - I'): {im_residuals:.3f}")
 
 			if (t + 1) % TEST_GEN_EVERY == 0 or ((e == num_epochs - 1) and t == len(loader_train) - 1):
 				# Create images using gen to visualize progress
@@ -141,7 +142,7 @@ def train_invgen(invgen, gen, dis, optimizer, loss_fn, loader_train, loader_val)
 	return gen_test_imgs, loss_hist
 
 
-def autoencoder_loss(imgs, fake_imgs, dis_features_fake, dis_features_real, lmbda):
+def autoencoder_loss(imgs, fake_imgs, dis_features_fake, dis_features_real):
 	"""
 	The autoencoder loss function described in the GONet paper
 
@@ -153,7 +154,11 @@ def autoencoder_loss(imgs, fake_imgs, dis_features_fake, dis_features_real, lmbd
 	- lmbda: A hyper parameter to tune how much of the loss comes from the img residuals ||I - I'||
 				and how much from Dis features ||f(I) - f(I')||
 	"""
-
+	num_imgs = imgs.size()[0]
+	residual_loss = torch.abs(imgs - fake_imgs).sum()
+	dis_loss = torch.abs(dis_features_real - dis_features_fake).sum()
+	loss = ((1 - lmbda) * residual_loss + lmbda * dis_loss) / num_imgs
+	return loss
 
 
 def load_feature_extraction_data(root_path):
@@ -214,12 +219,12 @@ def main():
 
 	# Load the Generator and Discriminator networks
 	gen = Generator()
-	gen, _, _ = load_model_params(gen, os.path.join(MODELS_LOAD_PATH, "gen"))
+	gen, _, _ = load_model_params(gen, os.path.join(LOAD_PATH, GEN_FILE), device)
 	for param in gen.parameters():
 		param.requires_grad = False  # freeze model
 
 	dis = Discriminator()
-	dis, _, _ = load_model_params(dis, os.path.join(MODELS_LOAD_PATH, "dis"))
+	dis, _, _ = load_model_params(dis, os.path.join(LOAD_PATH, DIS_FILE), device)
 	dis.mode = "eval"  # outputs conv layers instead of binary class
 	for param in dis.parameters():
 		param.requires_grad = False  # freeze model
@@ -227,23 +232,19 @@ def main():
 	# Set up for training
 	optimizer = optim.Adam(invgen.parameters(), lr=lr_invgen, betas=(beta1, 0.999))
 
-	# Combines a sigmoid (converts logits to probabilites) with Binary cross-entropy loss
-	loss = autoencoder_loss()
-
 	# Train the DCGAN network
 	gen_test_imgs, loss_hist = \
-		train_invgen(invgen, gen, dis, optimizer, loss, data_loaders["train"], data_loaders["val"])
+		train_invgen(invgen, gen, dis, optimizer, autoencoder_loss, data_loaders["train"], data_loaders["val"])
 
 	# Plot loss
 	plt.figure(figsize=(10,5))
 	plt.title("Autoencoder training loss")
-	plt.plot(loss_hist, label="gen")
+	plt.plot(loss_hist)
 	plt.xlabel("iteration")
 	plt.ylabel("loss")
-	plt.legend()
 	plt.show()
 
-	# Plot some real images and fake images
+	# Plot some real images
 	real_batch = next(iter(data_loaders["train"]))
 	plt.figure(figsize=(15, 15))
 	plt.subplot(1, 2, 1)

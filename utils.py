@@ -52,19 +52,21 @@ def save_model_params(model, name, save_path, epoch, optimizer=None, final_loss=
 	- optimizer
 	- final_loss: (optional float) used in the name of the file
 	"""
-	loss = final_loss if final_loss else 1.23456
-	filename = f"{name}_params__loss:{loss:.5f}_epoch:{epoch}"
+	if final_loss:
+		filename = f"{name}_params__loss{final_loss:.5f}_epoch{epoch}"
+	else:
+		filename = f"{name}_params__loss_NA_epoch{epoch}"
 	file_path = os.path.join(save_path, filename)
 	save_dict = {'epoch': epoch,
 	             'model_state_dict': model.state_dict(),
-	             'loss': loss}
+	             'loss': final_loss}
 	if optimizer:
 		save_dict['optimizer_state_dict'] = optimizer.state_dict()
 	torch.save(save_dict, file_path)
 	print(f"Saved model: {name} to file")
 
 
-def load_model_params(model, path, optimizer=None):
+def load_model_params(model, path, device, optimizer=None):
 	"""
 	Loads the model params for both the network and
 	the optimizer.
@@ -72,6 +74,7 @@ def load_model_params(model, path, optimizer=None):
 	Inputs:
 	- model: the pytorch model object to load the params into
 	- path: the full path name of the params file
+	- device: the device to load the model onto ('cpu' or 'cuda')
 	- optimizer (optional): the optimzier oject to load params into
 
 	Returns:
@@ -80,7 +83,10 @@ def load_model_params(model, path, optimizer=None):
 	- epoch: the epoch at which the params were saved
 	- loss: the loss produced by the loaded params
 	"""
-	checkpoint = torch.load(path)
+	if device == torch.device('cpu'):
+		checkpoint = torch.load(path, map_location=device)
+	else:
+		checkpoint = torch.load(path)
 	model.load_state_dict(checkpoint['model_state_dict'])
 	epoch = checkpoint['epoch']
 	loss = checkpoint['loss']
