@@ -3,11 +3,8 @@ Creating a Pytorch dataset from the GONet image data
 @author Nick Goodson
 """
 import os
-import time
-
 import torch
 from torch.utils.data import Dataset
-
 from PIL import Image
 
 
@@ -173,7 +170,7 @@ class Normalize:
 
 def display_num_images(data_sets):
 	"""
-	Displays the number of images in each data set in the
+	Displays the number of images in each folder of each data-set in the
 	list data_sets
 
 	Inputs:

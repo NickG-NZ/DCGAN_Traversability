@@ -18,8 +18,9 @@ import torchvision.utils as vutils
 import numpy as np
 import matplotlib.pyplot as plt
 
-from GO_DataSet import GONetDataSet, Normalize, display_num_images
+from DataSetDCGAN import DataSetDCGAN
 from GONet_torch import Generator, Discriminator, weights_init
+from utils import Normalize, display_num_images
 
 # ********* Change these paths for your computer **********************
 DATA_PATH = "/home/nick/Documents/Conv_NN_CS231n/Project/DCGAN_Traversability/GO_Data"
@@ -216,7 +217,7 @@ def save_model_params(model, name, save_path, epoch, final_loss=None):
 	print(f"Saved model: {name} to file")
 
 
-def load_feature_extraction_data(root_path, batch_size):
+def load_feature_extraction_data(root_path):
 	"""
 	Loads the 3 dataset splits for automatically labelled positive data
 	from GONet dataset
@@ -235,11 +236,11 @@ def load_feature_extraction_data(root_path, batch_size):
 
 	# Create data_set objects for each of the data splits
 	# Positive automatically labelled data
-	train_pos = GONetDataSet(root_path, "train", transform=transform)
-	val_pos = GONetDataSet(root_path, "vali", transform=transform)
-	test_pos = GONetDataSet(root_path, "test", transform=transform)
-	data_sets = [train_pos, val_pos, test_pos]
+	train_pos = DataSetDCGAN(root_path, "train", transform=transform)
+	val_pos = DataSetDCGAN(root_path, "vali", transform=transform)
+	test_pos = DataSetDCGAN(root_path, "test", transform=transform)
 	print("Loaded Automatically Labelled, Positive Datasets")
+	data_sets = [train_pos, val_pos, test_pos]
 	display_num_images(data_sets)
 
 	# Create DataLoaders for the data splits
@@ -255,7 +256,7 @@ def load_feature_extraction_data(root_path, batch_size):
 
 def main():
 	"""Run training of DCGAN"""
-	data_loaders, data_sets = load_feature_extraction_data(DATA_PATH, batch_size)
+	data_loaders, data_sets = load_feature_extraction_data(DATA_PATH)
 
 	# plot some training examples
 	plot_examples = False
