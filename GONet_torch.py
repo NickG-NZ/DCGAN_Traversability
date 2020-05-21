@@ -84,7 +84,8 @@ class InvGen(nn.Module):
 		h = F.relu(self.bn1(self.c1(h)))
 		h = F.relu(self.bn2(self.c2(h))) 
 		h = F.relu(self.bn3(self.c3(h)))
-		l = self.l4l(h)
+		flat = h.view(h.shape[0], -1)
+		l = self.l4l(flat)
 		return l
 
 class Discriminator(nn.Module):
