@@ -19,8 +19,8 @@ class DataSetDCGAN(Dataset):
 	"""
 	def __init__(self, root_dir, split, transform=None):
 
-		# Check that root_dir points to correct folder
-		assert (root_dir.split("/")[-1] == "GO_Data"),\
+		# Check that root_dir points to correct folder, changed for Google Cloud VM
+		assert (root_dir.split("/")[-1] == "GO_Data_GAN"),\
 			"The given root directory does not point to GO_Data"
 		self.root_dir = root_dir
 		self.split = split
