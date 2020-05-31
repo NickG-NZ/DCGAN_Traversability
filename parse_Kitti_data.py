@@ -24,6 +24,7 @@ from PIL import Image
 #********* Change this for your machines *****************
 DATA_PATH = "/home/nick/Documents/Conv_NN_CS231n/Project/DCGAN_Traversability/Kitti_Data"
 RAW_DATA_FOLDERS = ["2011_09_26_drive_0057_sync"]
+PREFIXES = ["57", ""]
 
 # Automatically label the data using a velocity threshold
 V_THRESH = 1.4  # [m/s] (5 km/h)
@@ -70,7 +71,7 @@ def auto_label_kitti(data_folder, prefix):
 			assert im == img_name, \
 			        f"couldn't find matching image {l + 1} for id:{file_id}"
 
-		rgb_name_1 = prefix + "2_" + img_name
+		rgb_name_1 = prefix + "_2_" + img_name
 		rgb_name_2 = prefix + "3_" + img_name
 		oxt_name = prefix + file_id + ".txt"
 		if velocity > V_THRESH:
@@ -118,10 +119,14 @@ def resize_images():
 			im_scaled.save(file_path)
 
 
-def train_val_test_split():
+def train_val_test_split(classifier_size):
 	"""
 	splits the data from the positive and negative
 	examples into different training sets
+
+	Inputs:
+	- classifier_size: The total number of images to be used for train, val, test
+						sets for the classifier
 
 	DCGAN / InvGen:
 	================
@@ -129,18 +134,53 @@ def train_val_test_split():
 
 	Classifier
 	===============
-	mixed (800 images) - train(70 %), validation(20 %), test (10 %)
+	mixed  - train(70 %), validation(20 %), test (10 %)
 	"""
-	# Take 400 positive and 400 negative examples for classifier
-	maybe_make_dir(os.path.join(DATA_PATH, "data_train_annotated"), "positive")
-	maybe_make_dir(os.path.join(DATA_PATH, "data_train_annotated"), "negative")
-	maybe_make_dir(os.path.join(DATA_PATH, "data_vali_annotated"), "negative")
+	pos = "positive"
+	neg = "negative"
+	splits = ["train", "vali", "test"]
+
+	print("splitting data")
+	# >>>>Take small subset of positive and negative examples for classifier<<<<<
+	split_percentages = [0.7, 0.2, 0.1]
+	pos_imgs = os.listdir(os.path.join(DATA_PATH, pos))
+	neg_imgs = os.listdir(os.path.join(DATA_PATH, neg))
+	for i, split in enumerate(splits):
+		split_folder = "data_" + split + "_annotated"
+		maybe_make_dir(DATA_PATH, split_folder)
+		maybe_make_dir(os.path.join(DATA_PATH, split_folder), pos)
+		maybe_make_dir(os.path.join(DATA_PATH, split_folder), neg)
+		split_size = (split_percentages[i] * classifier_size) // 2
+		pos_indicies = np.random.choice(np.arange(len(pos_imgs)), size=split_size, replace=False)
+		neg_indicies = np.random.choice(np.arange(len(neg_imgs)), size=split_size, replace=False)
+
+		for i in range(split_size):
+			# move the image files
+			img_name = pos_imgs[pos_indicies[i]]
+			os.rename(os.path.join(DATA_PATH, pos, img_name), os.path.join(DATA_PATH, split_folder, pos, img_name))
+			os.rename(os.path.join(DATA_PATH, neg, img_name), os.path.join(DATA_PATH, split_folder, neg, img_name))
+
+	# >>>>Randomly assign select a subset of the reamining positive images for training<<<<<
+	split_percentages = [0.8, 0.2]
+	# Train
+	pos_imgs = os.listdir(os.path.join(DATA_PATH, pos))
+	split_folder = "data_train"
+	maybe_make_dir(DATA_PATH, split_folder)
+	split_size = np.ceil(split_percentages[0] * len(pos_imgs))
+	indicies = np.random.choice(np.arange(len(pos_imgs)), size=split_size, replace=False)
+	for i in range(split_size):
+		img_name = pos_imgs[indicies[i]]
+		os.rename(os.path.join(DATA_PATH, pos, img_name), os.path.join(DATA_PATH, split_folder, img_name))
+
+	# >>>>>Move all remaining images in the positive folder to the validation folder<<<<<
+	split_folder = "data_validation"
+	pos_imgs = os.listdir(os.path.join(DATA_PATH, pos))
+	for img_name in pos_imgs:
+		os.rename(os.path.join(DATA_PATH, pos, img_name), os.path.join(DATA_PATH, split_folder, img_name))
 
 
-
-
-
-def _sort_and_resize(prefixes):
+def _sort_and_resize(prefixes, classifier_size):
+	"""Performs image processing on raw Kitti data"""
 
 	"""Sort the data into positive/negative"""
 	for i, data_folder in enumerate(RAW_DATA_FOLDERS):
@@ -150,20 +190,21 @@ def _sort_and_resize(prefixes):
 	resize_images()
 
 	"""split data into train, validation, test folders"""
+	train_val_test_split(classifier_size)
 
 
 def main():
-	# TODO: You need to fill in the RAW_DATA_FOLDERS list with the names of the Kitti raw data folders
-	# TODO: You need to fill in the prefixes (these are the numbers at the very end of the downloaded folders names (eg. 57))
+	# TODO: Fill in the RAW_DATA_FOLDERS list with the names of the Kitti raw data folders
+	# TODO: Fill in the PREFIXES (these are the numbers at the very end of the downloaded folders names (eg. 57))
 	# TODO: The number of prefixes should equal the number of raw data folders in the list RAW_DATA_FOLDERS
-	prefixes = ["57", ""]
+	prefixes = PREFIXES
+	classifier_size = 900  # num images to use for training the classifier
 
-	# get rid of the following assert code, I just put this check here to make sure you read the comment above
-	assert len(prefixes) > 2, "Nick made this error: You need to set the prefixes in the _sort_and_resize() function"
+	# comment out the following assert code
+	assert len(prefixes) > 50, "Nick made this error: You need to set the prefixes for the _sort_and_resize() function"
 
-	"""Perform the actual sorting process"""
-	_sort_and_resize(prefixes)
-
+	# Perform the actual sorting process
+	_sort_and_resize(prefixes, classifier_size)
 
 
 if __name__ == "__main__":
