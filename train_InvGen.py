@@ -33,7 +33,7 @@ DTYPE = torch.float32
 WORKERS = 0  # number of threads for Dataloaders (0 = singlethreaded)
 IMAGE_SIZE = 128
 # RANDOM_SEED = 291
-PRINT_EVERY = 1cd  # num iterations between printing learning stats
+PRINT_EVERY = 1 # num iterations between printing learning stats
 SAVE_EVERY = 50  # num iterations to save weights after (Assign to 'None' to turn off)
 SAVE_TIME_INTERVAL = 60 * 20  # save model every 20 minutes
 TEST_GEN_EVERY = 30  # how often (in iterations) to check images created by Gen(InvGen(I))
