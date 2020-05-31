@@ -118,6 +118,28 @@ def resize_images():
 			im_scaled.save(file_path)
 
 
+def train_val_test_split():
+	"""
+	splits the data from the positive and negative
+	examples into different training sets
+
+	DCGAN / InvGen:
+	================
+	postiive - train (80 %), validation (20 %)
+
+	Classifier
+	===============
+	mixed (800 images) - train(70 %), validation(20 %), test (10 %)
+	"""
+	# Take 400 positive and 400 negative examples for classifier
+	maybe_make_dir(os.path.join(DATA_PATH, "data_train_annotated"), "positive")
+	maybe_make_dir(os.path.join(DATA_PATH, "data_train_annotated"), "negative")
+	maybe_make_dir(os.path.join(DATA_PATH, "data_vali_annotated"), "negative")
+
+
+
+
+
 def _sort_and_resize(prefixes):
 
 	"""Sort the data into positive/negative"""
@@ -128,7 +150,6 @@ def _sort_and_resize(prefixes):
 	resize_images()
 
 	"""split data into train, validation, test folders"""
-
 
 
 def main():
