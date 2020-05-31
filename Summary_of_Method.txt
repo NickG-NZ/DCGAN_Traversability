@@ -182,3 +182,6 @@ This prevents extreme extrapolation behavior in the discriminator
 - Virtual batch normalization
 - Try Wasserstein loss Ld = D(x) - D(G(z)), Lg = -D(G(z))
 - Set beta1 for Adam = 0.5
+
+
+

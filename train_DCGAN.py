@@ -242,7 +242,7 @@ def main():
 	data_loaders, data_sets = load_feature_extraction_data(DATA_PATH)
 
 	# plot some training examples
-	plot_examples = False
+	plot_examples = True
 	if plot_examples:
 		real_batch = next(iter(data_loaders["train"]))
 		plt.figure(figsize=(8, 8))
