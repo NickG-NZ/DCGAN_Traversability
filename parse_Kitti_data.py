@@ -145,7 +145,7 @@ def train_val_test_split(classifier_size):
 	print("Splitting data\n")
 	if classifier_size > 1:
 		# >>>>Take small subset of positive and negative examples for classifier<<<<<
-		split_percentages = [0.7, 0.2, 0.1]
+		split_percentages = [0.4, 0.3, 0.3]
 		for i, split in enumerate(splits):
 			pos_imgs = os.listdir(os.path.join(DATA_PATH, pos))
 			neg_imgs = os.listdir(os.path.join(DATA_PATH, neg))
