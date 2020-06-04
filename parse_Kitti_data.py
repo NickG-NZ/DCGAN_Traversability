@@ -23,8 +23,8 @@ from PIL import Image
 
 #********* Change this for your machines *****************
 DATA_PATH = "/home/nick/Documents/Conv_NN_CS231n/Project/DCGAN_Traversability/Kitti_Data"
-RAW_DATA_FOLDERS = ["2011_09_26_drive_0057_sync"]
-PREFIXES = ["57", ""]
+RAW_DATA_FOLDERS = ["2011_09_26_drive_0060_sync"]
+PREFIXES = ["60"]
 
 # Automatically label the data using a velocity threshold
 V_THRESH = 1.4  # [m/s] (5 km/h)
@@ -72,7 +72,7 @@ def auto_label_kitti(data_folder, prefix):
 			        f"couldn't find matching image {l + 1} for id:{file_id}"
 
 		rgb_name_1 = prefix + "_2_" + img_name
-		rgb_name_2 = prefix + "3_" + img_name
+		rgb_name_2 = prefix + "_3_" + img_name
 		oxt_name = prefix + file_id + ".txt"
 		if velocity > V_THRESH:
 			split = "positive"
@@ -89,7 +89,7 @@ def maybe_make_dir(path, folder_name):
 	"""
 	try:
 		os.mkdir(os.path.join(path, folder_name))
-		print(f"Folder {folder_name} created")
+		print(f"Folder '/{folder_name}' created")
 	except FileExistsError:
 		pass
 
@@ -117,6 +117,7 @@ def resize_images():
 			im_cropped = img.crop((left, 0, right, height))
 			im_scaled = im_cropped.resize((128, 128))
 			im_scaled.save(file_path)
+	print("Resizing Complete")
 
 
 def train_val_test_split(classifier_size):
@@ -140,46 +141,55 @@ def train_val_test_split(classifier_size):
 	neg = "negative"
 	splits = ["train", "vali", "test"]
 
-	print("splitting data")
-	# >>>>Take small subset of positive and negative examples for classifier<<<<<
-	split_percentages = [0.7, 0.2, 0.1]
-	pos_imgs = os.listdir(os.path.join(DATA_PATH, pos))
-	neg_imgs = os.listdir(os.path.join(DATA_PATH, neg))
-	for i, split in enumerate(splits):
-		split_folder = "data_" + split + "_annotated"
-		maybe_make_dir(DATA_PATH, split_folder)
-		maybe_make_dir(os.path.join(DATA_PATH, split_folder), pos)
-		maybe_make_dir(os.path.join(DATA_PATH, split_folder), neg)
-		split_size = (split_percentages[i] * classifier_size) // 2
-		pos_indicies = np.random.choice(np.arange(len(pos_imgs)), size=split_size, replace=False)
-		neg_indicies = np.random.choice(np.arange(len(neg_imgs)), size=split_size, replace=False)
+	print("Splitting data\n")
+	if classifier_size > 1:
+		# >>>>Take small subset of positive and negative examples for classifier<<<<<
+		split_percentages = [0.7, 0.2, 0.1]
+		for i, split in enumerate(splits):
+			pos_imgs = os.listdir(os.path.join(DATA_PATH, pos))
+			neg_imgs = os.listdir(os.path.join(DATA_PATH, neg))
 
-		for i in range(split_size):
-			# move the image files
-			img_name = pos_imgs[pos_indicies[i]]
-			os.rename(os.path.join(DATA_PATH, pos, img_name), os.path.join(DATA_PATH, split_folder, pos, img_name))
-			os.rename(os.path.join(DATA_PATH, neg, img_name), os.path.join(DATA_PATH, split_folder, neg, img_name))
+			split_folder = "data_" + split + "_annotated"
+			maybe_make_dir(DATA_PATH, split_folder)
+			maybe_make_dir(os.path.join(DATA_PATH, split_folder), pos)
+			maybe_make_dir(os.path.join(DATA_PATH, split_folder), neg)
+			split_size = int((split_percentages[i] * classifier_size) / 2)
+			try:
+				pos_indicies = np.random.choice(np.arange(len(pos_imgs)), size=split_size, replace=False)
+				neg_indicies = np.random.choice(np.arange(len(neg_imgs)), size=split_size, replace=False)
+			except ValueError:
+				print("Not enough images to do split")
+				return
 
-	# >>>>Randomly assign select a subset of the reamining positive images for training<<<<<
+			for i in range(split_size):
+				# move the image files
+				img_pos = pos_imgs[pos_indicies[i]]
+				img_neg = neg_imgs[neg_indicies[i]]
+				os.rename(os.path.join(DATA_PATH, pos, img_pos), os.path.join(DATA_PATH, split_folder, pos, img_pos))
+				os.rename(os.path.join(DATA_PATH, neg, img_neg), os.path.join(DATA_PATH, split_folder, neg, img_neg))
+
+	# >>>>Randomly assign select a subset of the remaining positive images for training<<<<<
 	split_percentages = [0.8, 0.2]
 	# Train
-	pos_imgs = os.listdir(os.path.join(DATA_PATH, pos))
+	train_imgs = os.listdir(os.path.join(DATA_PATH, pos))
 	split_folder = "data_train"
 	maybe_make_dir(DATA_PATH, split_folder)
-	split_size = np.ceil(split_percentages[0] * len(pos_imgs))
-	indicies = np.random.choice(np.arange(len(pos_imgs)), size=split_size, replace=False)
+	split_size = int(split_percentages[0] * len(train_imgs))
+	indicies = np.random.choice(np.arange(len(train_imgs)), size=split_size, replace=False)
 	for i in range(split_size):
-		img_name = pos_imgs[indicies[i]]
+		img_name = train_imgs[indicies[i]]
 		os.rename(os.path.join(DATA_PATH, pos, img_name), os.path.join(DATA_PATH, split_folder, img_name))
 
 	# >>>>>Move all remaining images in the positive folder to the validation folder<<<<<
-	split_folder = "data_validation"
-	pos_imgs = os.listdir(os.path.join(DATA_PATH, pos))
-	for img_name in pos_imgs:
+	split_folder = "data_vali"
+	maybe_make_dir(DATA_PATH, split_folder)
+	val_imgs = os.listdir(os.path.join(DATA_PATH, pos))
+	for img_name in val_imgs:
 		os.rename(os.path.join(DATA_PATH, pos, img_name), os.path.join(DATA_PATH, split_folder, img_name))
+	print("\nData splitting complete")
 
 
-def _sort_and_resize(prefixes, classifier_size):
+def _sort_and_resize(prefixes):
 	"""Performs image processing on raw Kitti data"""
 
 	"""Sort the data into positive/negative"""
@@ -189,22 +199,22 @@ def _sort_and_resize(prefixes, classifier_size):
 	"""resize the images"""
 	resize_images()
 
-	"""split data into train, validation, test folders"""
-	train_val_test_split(classifier_size)
-
 
 def main():
 	# TODO: Fill in the RAW_DATA_FOLDERS list with the names of the Kitti raw data folders
 	# TODO: Fill in the PREFIXES (these are the numbers at the very end of the downloaded folders names (eg. 57))
 	# TODO: The number of prefixes should equal the number of raw data folders in the list RAW_DATA_FOLDERS
 	prefixes = PREFIXES
-	classifier_size = 900  # num images to use for training the classifier
-
+	assert(len(prefixes) == len(RAW_DATA_FOLDERS)), "Need a prefix for each folder"
 	# comment out the following assert code
-	assert len(prefixes) > 50, "Nick made this error: You need to set the prefixes for the _sort_and_resize() function"
+	# assert len(prefixes) > 50, "Nick made this error: You need to set the prefixes for the _sort_and_resize() function"
 
 	# Perform the actual sorting process
-	_sort_and_resize(prefixes, classifier_size)
+	_sort_and_resize(prefixes)
+
+	"""split data into train, validation, test folders"""
+	# classifier_size = 30  # num images to use for training the classifier
+	# train_val_test_split(classifier_size)
 
 
 if __name__ == "__main__":
