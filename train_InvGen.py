@@ -33,8 +33,8 @@ DTYPE = torch.float32
 WORKERS = 0  # number of threads for Dataloaders (0 = singlethreaded)
 IMAGE_SIZE = 128
 # RANDOM_SEED = 291
-PRINT_EVERY = 1 # num iterations between printing learning stats
-SAVE_EVERY = 50  # num iterations to save weights after (Assign to 'None' to turn off)
+PRINT_EVERY = 50 # num iterations between printing learning stats
+SAVE_EVERY = 200  # num iterations to save weights after (Assign to 'None' to turn off)
 SAVE_TIME_INTERVAL = 60 * 20  # save model every 20 minutes
 TEST_GEN_EVERY = 30  # how often (in iterations) to check images created by Gen(InvGen(I))
 
@@ -136,7 +136,7 @@ def train_invgen(invgen, gen, dis, optimizer, loss_fn, loader_train, loader_val)
 
 			if (SAVE_EVERY and (t + 1) % SAVE_EVERY == 0) or timed_save:
 				# Save the model weights in a folder labelled with the validation accuracy
-				save_model_params(invgen, "invgen", SAVE_PATH, e, loss_hist[-1])
+				save_model_params(invgen, "invgen", SAVE_PATH, e, final_loss=loss_hist[-1])
 				timed_save = False
 
 	return gen_test_imgs, loss_hist
@@ -223,16 +223,15 @@ def main():
 	for param in gen.parameters():
 		param.requires_grad = False  # freeze model
 
-	dis = Discriminator()
+	dis = Discriminator(mode="eval")  # outputs conv layers instead of binary class
 	dis, _, _ = load_model_params(dis, os.path.join(LOAD_PATH, DIS_FILE), device)
-	dis.mode = "eval"  # outputs conv layers instead of binary class
 	for param in dis.parameters():
 		param.requires_grad = False  # freeze model
 
 	# Set up for training
 	optimizer = optim.Adam(invgen.parameters(), lr=lr_invgen, betas=(beta1, 0.999))
 
-	# Train the DCGAN network
+	# Train the InvGen network
 	gen_test_imgs, loss_hist = \
 		train_invgen(invgen, gen, dis, optimizer, autoencoder_loss, data_loaders["train"], data_loaders["val"])
 

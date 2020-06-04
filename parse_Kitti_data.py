@@ -1,9 +1,7 @@
 """
 Utiltiies for parsing Raw [synced + rectified] Kitti data
 Uses the velocity data to automatically classify image frames as traversable / non-traversable
-"""
 
-"""
 1) Use velocity threshold to separate images into two folders
 	- likely traversable/positive
 	- likely untraversable/negative
@@ -13,7 +11,10 @@ Uses the velocity data to automatically classify image frames as traversable / n
 
 2) Check the images in the positive folder (along with their velocities) to ensure they seem reasonable
 
-5) Split the main positive folder into train and validation folders (use ~ 80-20 split) in order
+5) Split the folders into two lots of training/test splits:
+	a) The DCGAN and Autoencoder splits (data_train, data_vali)
+	b) The classifier splits (data_train_annotated, data_vali_annotated, data_test_annotated)
+			each classifer split has two subfolders (positive, negative)
 """
 
 import os
@@ -23,8 +24,8 @@ from PIL import Image
 
 #********* Change this for your machines *****************
 DATA_PATH = "/home/nick/Documents/Conv_NN_CS231n/Project/DCGAN_Traversability/Kitti_Data"
-RAW_DATA_FOLDERS = ["2011_09_26_drive_0060_sync"]
-PREFIXES = ["60"]
+RAW_DATA_FOLDERS = ["2011_09_26_drive_0020_sync"]
+PREFIXES = ["20"]
 
 # Automatically label the data using a velocity threshold
 V_THRESH = 1.4  # [m/s] (5 km/h)
@@ -41,7 +42,7 @@ def auto_label_kitti(data_folder, prefix):
 	inputs:
 	- data_folder: (string) the folder name for the raw kitti data
 	- prefix: (string) prefix to add to the front of all imgs that are moved
-				from the given Kitti data folder. All Kitti raw data-sets use the same filenames
+				from the given Kitti data-set. All Kitti raw data-sets use the same file-names
 				so it is neccessary to differentiate the files when concatenating multiple data-sets
 	"""
 	maybe_make_dir(DATA_PATH, "positive")
@@ -131,7 +132,7 @@ def train_val_test_split(classifier_size):
 
 	DCGAN / InvGen:
 	================
-	postiive - train (80 %), validation (20 %)
+	positive - train (80 %), validation (20 %)
 
 	Classifier
 	===============
@@ -153,7 +154,7 @@ def train_val_test_split(classifier_size):
 			maybe_make_dir(DATA_PATH, split_folder)
 			maybe_make_dir(os.path.join(DATA_PATH, split_folder), pos)
 			maybe_make_dir(os.path.join(DATA_PATH, split_folder), neg)
-			split_size = int((split_percentages[i] * classifier_size) / 2)
+			split_size = int((split_percentages[i] * classifier_size) / 2)  # divide 2 for pos/neg
 			try:
 				pos_indicies = np.random.choice(np.arange(len(pos_imgs)), size=split_size, replace=False)
 				neg_indicies = np.random.choice(np.arange(len(neg_imgs)), size=split_size, replace=False)
@@ -167,6 +168,7 @@ def train_val_test_split(classifier_size):
 				img_neg = neg_imgs[neg_indicies[i]]
 				os.rename(os.path.join(DATA_PATH, pos, img_pos), os.path.join(DATA_PATH, split_folder, pos, img_pos))
 				os.rename(os.path.join(DATA_PATH, neg, img_neg), os.path.join(DATA_PATH, split_folder, neg, img_neg))
+
 
 	# >>>>Randomly assign select a subset of the remaining positive images for training<<<<<
 	split_percentages = [0.8, 0.2]
@@ -187,6 +189,7 @@ def train_val_test_split(classifier_size):
 	for img_name in val_imgs:
 		os.rename(os.path.join(DATA_PATH, pos, img_name), os.path.join(DATA_PATH, split_folder, img_name))
 	print("\nData splitting complete")
+
 
 
 def _sort_and_resize(prefixes):
@@ -210,11 +213,11 @@ def main():
 	# assert len(prefixes) > 50, "Nick made this error: You need to set the prefixes for the _sort_and_resize() function"
 
 	# Perform the actual sorting process
-	_sort_and_resize(prefixes)
+	# _sort_and_resize(prefixes)
 
 	"""split data into train, validation, test folders"""
-	# classifier_size = 30  # num images to use for training the classifier
-	# train_val_test_split(classifier_size)
+	classifier_size = 40  # num images to use for training the classifier
+	train_val_test_split(classifier_size)
 
 
 if __name__ == "__main__":
