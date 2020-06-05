@@ -14,6 +14,7 @@ from torch.utils.data import Dataset, DataLoader
 from torch.utils.data import RandomSampler
 import torchvision.transforms as T
 import torchvision.utils as vutils
+from torchvision.utils import save_image
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -23,16 +24,17 @@ from GONet_torch import Generator, Discriminator, weights_init
 from utils import Normalize, display_num_images, save_model_params, load_model_params
 
 # ********* Change these paths for your computer **********************
-DATA_PATH = "/home/nick/Documents/Conv_NN_CS231n/Project/DCGAN_Traversability/GO_Data"
-SAVE_PATH = "/home/nick/Documents/Conv_NN_CS231n/Project/DCGAN_Traversability/Training_Checkpoints/DCGAN"
+DATA_PATH = "/home/nick/Kitti_Data"
+SAVE_PATH = "/home/nick/Model_Saves/DCGAN"
+IMAGE_SAVE_PATH = "/home/nick/GAN_Img"
 USE_GPU = True
 DTYPE = torch.float32
-WORKERS = 0  # number of threads for Dataloaders (0 = singlethreaded)
+WORKERS = 8  # number of threads for Dataloaders (0 = singlethreaded)
 IMAGE_SIZE = 128
 # RANDOM_SEED = 291
-PRINT_EVERY = 20  # num iterations between printing learning stats
-SAVE_EVERY = 1  # num iterations to save weights after (Assign to 'None' to turn off)
-SAVE_TIME_INTERVAL = 60 * 20  # save model every 20 minutes
+PRINT_EVERY = 60  # num iterations between printing learning stats
+SAVE_EVERY = 120  # num iterations to save weights after (Assign to 'None' to turn off)
+SAVE_TIME_INTERVAL = 60 * 30  # save model every 20 minutes
 TEST_GEN_EVERY = 30  # how often (in iterations) to check images gen creates from the fixed noise
 
 if USE_GPU and torch.cuda.is_available():
@@ -48,9 +50,9 @@ print(f"using device: {device}")
 ########################################
 beta1 = 0.5  # For ADAM optimizer
 batch_size = 64
-num_epochs = 1
+num_epochs = 10
 lr_gen = 0.0004
-lr_dis = 0.0001
+lr_dis = 0.0001  # 0.0007
 from GONet_torch import nz  # size of latent vector z
 label_smoothing_start = 15  # what iteration to start label smoothing
 #######################################
@@ -141,7 +143,10 @@ def train_dcgan(gen, dis, optimizer_g, optimizer_d, loss_fn, loader_train, loade
 				# Create images using gen to visualize progress
 				with torch.no_grad():
 					ims = gen(fixed_latent_vectors).detach()
-				gen_test_imgs.append(vutils.make_grid(ims, padding=2, normalize=True))
+				img_array = vutils.make_grid(ims, padding=2, normalize=True)
+				gen_test_imgs.append(img_array)
+				img_path = os.path.join(IMAGE_SAVE_PATH, "GAN_Gen_" + str(t)+ "_" + str(e) + ".png")
+				save_image(img_array, img_path)
 				# *** uncomment to see images produced by gen during training (unlikely to work on remote server) ***
 				# plt.imshow(np.transpose(gen_test_imgs[-1].cpu(), (1, 2, 0)))
 				# plt.show()
@@ -248,9 +253,14 @@ def main():
 		plt.figure(figsize=(8, 8))
 		plt.axis("off")
 		plt.title("Training Images")
-		plt.imshow(np.transpose(vutils.make_grid(real_batch[0].to(device)[:batch_size], padding=2,
-		                                         normalize=True).cpu(), (1, 2, 0)))
-		plt.show()
+		# plt.imshow(np.transpose(vutils.make_grid(real_batch[0].to(device)[:batch_size], padding=2,
+		#                                          normalize=True).cpu(), (1, 2, 0)))
+		# plt.show()
+		img_array = vutils.make_grid(real_batch[0][:batch_size], padding=2, normalize=True)
+		img_path = os.path.join(IMAGE_SAVE_PATH, "Real.png")
+		save_image(img_array, img_path)
+
+
 
 	# Create the Generator and Discriminator networks
 	gen = Generator()
@@ -278,21 +288,22 @@ def main():
 	plt.ylabel("loss")
 	plt.legend()
 	plt.show()
+	plt.savefig("loss.png")
 
-	# Plot some real images and fake images
-	real_batch = next(iter(data_loaders["train"]))
-	plt.figure(figsize=(15, 15))
-	plt.subplot(1, 2, 1)
-	plt.axis("off")
-	plt.title("Real Images")
-	plt.imshow(np.transpose(vutils.make_grid(real_batch[0].to(device)[:batch_size], padding=2,
-	                                         normalize=True).cpu(), (1, 2, 0)))
-	# Plot the fake images from the last epoch
-	plt.subplot(1, 2, 2)
-	plt.axis("off")
-	plt.title("Fake Images")
-	plt.imshow(np.transpose(gen_test_imgs[-1], (1, 2, 0)))
-	plt.show()
+	# # Plot some real images and fake images
+	# real_batch = next(iter(data_loaders["train"]))
+	# plt.figure(figsize=(15, 15))
+	# plt.subplot(1, 2, 1)
+	# plt.axis("off")
+	# plt.title("Real Images")
+	# plt.imshow(np.transpose(vutils.make_grid(real_batch[0].to(device)[:batch_size], padding=2,
+	#                                          normalize=True).cpu(), (1, 2, 0)))
+	# # Plot the fake images from the last epoch
+	# plt.subplot(1, 2, 2)
+	# plt.axis("off")
+	# plt.title("Fake Images")
+	# plt.imshow(np.transpose(gen_test_imgs[-1], (1, 2, 0)))
+	# plt.show()
 
 if __name__ == "__main__":
 	main()
