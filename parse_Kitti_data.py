@@ -23,7 +23,7 @@ import shutil
 from PIL import Image
 
 #********* Change this for your machines *****************
-DATA_PATH = "/home/nick/Documents/Conv_NN_CS231n/Project/DCGAN_Traversability/Kitti_Data"
+DATA_PATH = "/home/nick/Kitti_Data/"
 RAW_DATA_FOLDERS = ["2011_09_26_drive_0020_sync"]
 PREFIXES = ["20"]
 
@@ -145,7 +145,7 @@ def train_val_test_split(classifier_size):
 	print("Splitting data\n")
 	if classifier_size > 1:
 		# >>>>Take small subset of positive and negative examples for classifier<<<<<
-		split_percentages = [0.7, 0.2, 0.1]
+		split_percentages = [0.4, 0.3, 0.3]
 		for i, split in enumerate(splits):
 			pos_imgs = os.listdir(os.path.join(DATA_PATH, pos))
 			neg_imgs = os.listdir(os.path.join(DATA_PATH, neg))
@@ -216,7 +216,7 @@ def main():
 	# _sort_and_resize(prefixes)
 
 	"""split data into train, validation, test folders"""
-	classifier_size = 40  # num images to use for training the classifier
+	classifier_size = 4000  # num images to use for training the classifier
 	train_val_test_split(classifier_size)
 
 
