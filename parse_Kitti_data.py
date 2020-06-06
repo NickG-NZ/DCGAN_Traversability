@@ -23,7 +23,7 @@ import shutil
 from PIL import Image
 
 #********* Change this for your machines *****************
-DATA_PATH = "/home/nick/Documents/Conv_NN_CS231n/Project/DCGAN_Traversability/Kitti_Data"
+DATA_PATH = "/home/nick/Kitti_Data/"
 RAW_DATA_FOLDERS = ["2011_09_26_drive_0020_sync"]
 PREFIXES = ["20"]
 
@@ -216,7 +216,7 @@ def main():
 	# _sort_and_resize(prefixes)
 
 	"""split data into train, validation, test folders"""
-	classifier_size = 40  # num images to use for training the classifier
+	classifier_size = 4000  # num images to use for training the classifier
 	train_val_test_split(classifier_size)
 
 
