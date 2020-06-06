@@ -274,8 +274,8 @@ def main():
 	optimizer_d = optim.Adam(dis.parameters(), lr=lr_dis, betas=(beta1, 0.999))
 
 	# Load model and optimizer params
-	gen_path = os.path.join(LOAD_PATH, "gen_params_loss2.44192_epoch9")
-	dis_path = os.path.join(LOAD_PATH, "dis_params_loss0.87443_epoch9")
+	gen_path = os.path.join(LOAD_PATH, "gen_params__loss2.44192_epoch9")
+	dis_path = os.path.join(LOAD_PATH, "dis_params__loss0.87443_epoch9")
 	gen, optimizer,_, _ = load_model_params(gen, gen_path, device, optimizer_g)
 	dis, optimizer,_, _ = load_model_params(dis, dis_path, device, optimizer_d)
 
