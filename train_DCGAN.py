@@ -1,4 +1,4 @@
-"""
+g"""
 Training code for GONet DCGAN
 @author Nick Goodson
 """
@@ -26,6 +26,7 @@ from utils import Normalize, display_num_images, save_model_params, load_model_p
 # ********* Change these paths for your computer **********************
 DATA_PATH = "/home/nick/Kitti_Data"
 SAVE_PATH = "/home/nick/Model_Saves/DCGAN"
+LOAD_PATH = "/home/nick/Model_Saves/Best"
 IMAGE_SAVE_PATH = "/home/nick/GAN_Img"
 USE_GPU = True
 DTYPE = torch.float32
@@ -145,7 +146,7 @@ def train_dcgan(gen, dis, optimizer_g, optimizer_d, loss_fn, loader_train, loade
 					ims = gen(fixed_latent_vectors).detach()
 				img_array = vutils.make_grid(ims, padding=2, normalize=True)
 				gen_test_imgs.append(img_array)
-				img_path = os.path.join(IMAGE_SAVE_PATH, "GAN_Gen_" + str(t)+ "_" + str(e) + ".png")
+				img_path = os.path.join(IMAGE_SAVE_PATH, "GAN_Gen_" + str(e) + "_" + str(t) + ".png")
 				save_image(img_array, img_path)
 				# *** uncomment to see images produced by gen during training (unlikely to work on remote server) ***
 				# plt.imshow(np.transpose(gen_test_imgs[-1].cpu(), (1, 2, 0)))
@@ -264,13 +265,19 @@ def main():
 
 	# Create the Generator and Discriminator networks
 	gen = Generator()
-	gen.apply(weights_init)
+	# gen.apply(weights_init)
 	dis = Discriminator()
-	dis.apply(weights_init)
+	# dis.apply(weights_init)
 
 	# Set up for training
 	optimizer_g = optim.Adam(gen.parameters(), lr=lr_gen, betas=(beta1, 0.999))
 	optimizer_d = optim.Adam(dis.parameters(), lr=lr_dis, betas=(beta1, 0.999))
+
+	# Load model and optimizer params
+	gen_path = os.path.join(LOAD_PATH, "gen_params_loss2.44192_epoch9")
+	dis_path = os.path.join(LOAD_PATH, "dis_params_loss0.87443_epoch9")
+	gen = load_model_params(gen, gen_path, device, optimizer_g)
+	dis = load_model_params(dis, dis_path, device, optimizer_d)
 
 	# Combines a sigmoid (converts logits to probabilites) with Binary cross-entropy loss
 	loss = nn.BCEWithLogitsLoss()
@@ -288,7 +295,7 @@ def main():
 	plt.ylabel("loss")
 	plt.legend()
 	plt.show()
-	plt.savefig("loss.png")
+	plt.savefig(os.path.join(IMAGE_SAVE_PATH, "loss.png"))
 
 	# # Plot some real images and fake images
 	# real_batch = next(iter(data_loaders["train"]))

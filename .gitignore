@@ -3,6 +3,7 @@
 GONet.py
 GONet_T.py
 /Kitti_Data
+/Kitti_Training
 .ipynb_checkpoints
 .pyc
 TODO.txt
