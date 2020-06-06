@@ -274,8 +274,8 @@ def main():
 		# Model
 		gen_path = os.path.join(LOAD_PATH, GEN_NAME)
 		dis_path = os.path.join(LOAD_PATH, DIS_NAME)
-		gen, optimizer,_, _ = load_model_params(gen, gen_path, device)
-		dis, optimizer,_, _ = load_model_params(dis, dis_path, device)
+		gen, _, _ = load_model_params(gen, gen_path, device)
+		dis, _, _ = load_model_params(dis, dis_path, device)
 		gen = gen.to(device=device)
 		dis = dis.to(device=device)
 
