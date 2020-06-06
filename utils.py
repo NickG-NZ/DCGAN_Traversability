@@ -53,9 +53,9 @@ def save_model_params(model, name, save_path, epoch, optimizer=None, final_loss=
 	- final_loss: (optional float) used in the name of the file
 	"""
 	if final_loss:
-		filename = f"{name}_params__loss{final_loss:.5f}_epoch{epoch}"
+		filename = f"{name}_params__loss{final_loss:.5f}_epoch{epoch}.tar"
 	else:
-		filename = f"{name}_params__loss_NA_epoch{epoch}"
+		filename = f"{name}_params__loss_NA_epoch{epoch}.tar"
 	file_path = os.path.join(save_path, filename)
 	save_dict = {'epoch': epoch,
 	             'model_state_dict': model.state_dict(),
@@ -83,10 +83,10 @@ def load_model_params(model, path, device, optimizer=None):
 	- epoch: the epoch at which the params were saved
 	- loss: the loss produced by the loaded params
 	"""
-	if device == torch.device('cpu'):
-		checkpoint = torch.load(path, map_location=device)
-	else:
-		checkpoint = torch.load(path)
+	# if device == torch.device('cpu'):
+	# 	checkpoint = torch.load(path, map_location=device)
+	# else:
+	checkpoint = torch.load(path, map_location=device)
 	model.load_state_dict(checkpoint['model_state_dict'])
 	epoch = checkpoint['epoch']
 	loss = checkpoint['loss']
