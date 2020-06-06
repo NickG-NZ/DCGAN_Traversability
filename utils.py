@@ -39,7 +39,7 @@ def display_num_images(data_sets):
 		print(f"num images = {len(dataset)}")
 
 
-def save_model_params(model, name, save_path, epoch, optimizer=None, final_loss=None):
+def save_params(model, name, save_path, epoch, optimizer=None, final_loss=None):
 	"""
 	Saves the models parameters to the selected path
 	using built in pytorch fucntionality
@@ -66,31 +66,32 @@ def save_model_params(model, name, save_path, epoch, optimizer=None, final_loss=
 	print(f"Saved model: {name} to file")
 
 
-def load_model_params(model, path, device, optimizer=None):
+def load_model_params(model, path, device):
 	"""
-	Loads the model params for both the network and
-	the optimizer.
+	Loads saved params into a model
 
 	Inputs:
 	- model: the pytorch model object to load the params into
 	- path: the full path name of the params file
 	- device: the device to load the model onto ('cpu' or 'cuda')
-	- optimizer (optional): the optimzier oject to load params into
 
 	Returns:
 	- model: the model with params loaded
-	- optimizer: the optimizer with params loaded
 	- epoch: the epoch at which the params were saved
 	- loss: the loss produced by the loaded params
 	"""
-	# if device == torch.device('cpu'):
-	# 	checkpoint = torch.load(path, map_location=device)
-	# else:
 	checkpoint = torch.load(path, map_location=device)
 	model.load_state_dict(checkpoint['model_state_dict'])
 	epoch = checkpoint['epoch']
 	loss = checkpoint['loss']
-	if optimizer:
-		optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-		return model, optimizer, epoch, loss
+
 	return model, epoch, loss
+
+
+def load_optimizer_params(optimizer, path, device):
+	"""
+	Loads saved params into an optimizer
+	"""
+	checkpoint = torch.load(path, map_location=device)
+	optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+	return optimizer

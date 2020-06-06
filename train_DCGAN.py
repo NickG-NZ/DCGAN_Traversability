@@ -21,13 +21,16 @@ import matplotlib.pyplot as plt
 
 from DataSetDCGAN import DataSetDCGAN
 from GONet_torch import Generator, Discriminator, weights_init
-from utils import Normalize, display_num_images, save_model_params, load_model_params
+from utils import *
 
 # ********* Change these paths for your computer **********************
 DATA_PATH = "/home/nick/Kitti_Data"
 SAVE_PATH = "/home/nick/Model_Saves/DCGAN"
 LOAD_PATH = "/home/nick/Model_Saves/Best"
+GEN_NAME = "gen_params__loss2.44192_epoch9"
+DIS_NAME = "dis_params__loss0.87443_epoch9"
 IMAGE_SAVE_PATH = "/home/nick/GAN_Img"
+LOAD_PARAMS = True
 USE_GPU = True
 DTYPE = torch.float32
 WORKERS = 8  # number of threads for Dataloaders (0 = singlethreaded)
@@ -162,8 +165,8 @@ def train_dcgan(gen, dis, optimizer_g, optimizer_d, loss_fn, loader_train, loade
 
 			if (SAVE_EVERY and (t + 1) % SAVE_EVERY == 0) or timed_save:
 				# Save the model weights in a folder labelled with the validation accuracy
-				save_model_params(gen, "gen", SAVE_PATH, e, optimizer_g, gen_loss_hist[-1])
-				save_model_params(dis, "dis", SAVE_PATH, e, optimizer_d, dis_loss_hist[-1])
+				save_params(gen, "gen", SAVE_PATH, e, optimizer_g, gen_loss_hist[-1])
+				save_params(dis, "dis", SAVE_PATH, e, optimizer_d, dis_loss_hist[-1])
 				timed_save = False
 
 	return gen_test_imgs, gen_loss_hist, dis_loss_hist, dis_acc_hist
@@ -265,19 +268,27 @@ def main():
 
 	# Create the Generator and Discriminator networks
 	gen = Generator()
-	# gen.apply(weights_init)
 	dis = Discriminator()
-	# dis.apply(weights_init)
 
-	# Set up for training
-	optimizer_g = optim.Adam(gen.parameters(), lr=lr_gen, betas=(beta1, 0.999))
-	optimizer_d = optim.Adam(dis.parameters(), lr=lr_dis, betas=(beta1, 0.999))
+	if LOAD_PARAMS:
+		# Model
+		gen_path = os.path.join(LOAD_PATH, GEN_NAME)
+		dis_path = os.path.join(LOAD_PATH, DIS_NAME)
+		gen, optimizer,_, _ = load_model_params(gen, gen_path, device)
+		dis, optimizer,_, _ = load_model_params(dis, dis_path, device)
+		gen = gen.to(device=device)
+		dis = dis.to(device=device)
 
-	# Load model and optimizer params
-	gen_path = os.path.join(LOAD_PATH, "gen_params__loss2.44192_epoch9")
-	dis_path = os.path.join(LOAD_PATH, "dis_params__loss0.87443_epoch9")
-	gen, optimizer,_, _ = load_model_params(gen, gen_path, device, optimizer_g)
-	dis, optimizer,_, _ = load_model_params(dis, dis_path, device, optimizer_d)
+		# Optimizer
+		optimizer_g = optim.Adam(gen.parameters(), lr=lr_gen, betas=(beta1, 0.999))
+		optimizer_d = optim.Adam(dis.parameters(), lr=lr_dis, betas=(beta1, 0.999))
+		optimizer_g = load_optimizer_params(optimizer_g, gen_path, device)
+		optimizer_d = load_optimizer_params(optimizer_d, dis_path, device)
+	else:
+		gen.apply(weights_init)
+		dis.apply(weights_init)
+		optimizer_g = optim.Adam(gen.parameters(), lr=lr_gen, betas=(beta1, 0.999))
+		optimizer_d = optim.Adam(dis.parameters(), lr=lr_dis, betas=(beta1, 0.999))
 
 	# Combines a sigmoid (converts logits to probabilites) with Binary cross-entropy loss
 	loss = nn.BCEWithLogitsLoss()
