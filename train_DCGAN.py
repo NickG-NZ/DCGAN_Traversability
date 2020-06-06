@@ -1,4 +1,4 @@
-g"""
+"""
 Training code for GONet DCGAN
 @author Nick Goodson
 """
