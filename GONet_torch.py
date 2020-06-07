@@ -94,25 +94,22 @@ class Discriminator(nn.Module):
 	def __init__(self, mode='train'):
 		super().__init__()
 		self.mode = mode
-		self.c0 = nn.Conv2d(3, 64, 4, stride=2, padding=1)
-		self.c1 = nn.Conv2d(64, 128, 4, stride=2, padding=1)
-		self.c2 = nn.Conv2d(128, 256, 4, stride=2, padding=1)
-		self.c3 = nn.Conv2d(256, 512, 4, stride=2, padding=1)
+		self.c0 = spectral_norm(nn.Conv2d(3, 64, 4, stride=2, padding=1))()
+		self.c1 = spectral_norm(nn.Conv2d(64, 128, 4, stride=2, padding=1))()
+		self.c2 = spectral_norm(nn.Conv2d(128, 256, 4, stride=2, padding=1))()
+		self.c3 = spectral_norm(nn.Conv2d(256, 512, 4, stride=2, padding=1))()
 		# self.l4l = nn.Linear(8*8*512, 2)\
 		self.l4l = nn.Linear(8*8*512, 1)
-		# self.bn0 = nn.BatchNorm2d(64, eps=2e-05, momentum=0.1)
-		# self.bn1 = nn.BatchNorm2d(128, eps=2e-05, momentum=0.1)
-		# self.bn2 = nn.BatchNorm2d(256, eps=2e-05, momentum=0.1)
-		# self.bn3 = nn.BatchNorm2d(512, eps=2e-05, momentum=0.1)
+		self.bn0 = nn.BatchNorm2d(64, eps=2e-05, momentum=0.1)
+		self.bn1 = nn.BatchNorm2d(128, eps=2e-05, momentum=0.1)
+		self.bn2 = nn.BatchNorm2d(256, eps=2e-05, momentum=0.1)
+		self.bn3 = nn.BatchNorm2d(512, eps=2e-05, momentum=0.1)
         
 	def forward(self, x):
 		h = F.elu(self.c0(x))
-		# h = F.elu(self.bn1(self.c1(h)))
-		# h = F.elu(self.bn2(self.c2(h)))
-		# h = F.elu(self.bn3(self.c3(h)))
-		h = F.elu(spectral_norm(self.c1(h)))
-		h = F.elu(spectral_norm(self.c2(h)))
-		h = F.elu(spectral_norm(self.c3(h)))
+		h = F.elu(self.bn1(self.c1(h)))
+		h = F.elu(self.bn2(self.c2(h)))
+		h = F.elu(self.bn3(self.c3(h)))
 		flat = h.view(h.shape[0], -1)
 		l = self.l4l(flat)
 		if self.mode == 'train':
