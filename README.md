@@ -1,4 +1,4 @@
-# CS231n_Traversibility
+# DCGAN Traversibility
 Using a DCGAN to classify scenes as traversible for mobile robots
 
 ## Dependencies
