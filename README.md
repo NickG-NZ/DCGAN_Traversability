@@ -11,9 +11,9 @@ Using a DCGAN to classify scenes as traversible for mobile robots
 
 ## Installation with Conda
 1. Create a conda [environment](https://docs.conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html#creating-an-environment-with-commands)
-```conda create -n cs231n python=3.7```
+```conda create -n my_env python=3.7```
 2. Activate the environment, from any directory type:
-```conda activate cs231n```
+```conda activate my_env```
 2. Install the dependencies into the environment
 ```conda install Pillow=7.1.2```
 3. Check the installed dependencies
